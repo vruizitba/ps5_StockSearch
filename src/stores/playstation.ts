@@ -22,7 +22,7 @@ import { BROWSER_HEADERS, fetchWithTimeout, blocked, error, looksBlocked } from 
  * una conexion residencial dan 200. Por eso se reintenta: cada intento sale por
  * otra IP y suele pasar en el segundo o tercero.
  */
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 7;
 const PRODUCT_CODE = '1000050928'; // PlayStation 5 Pro Console - 2 TB
 const API =
   'https://api.direct.playstation.com/commercewebservices/ps-direct-us/users/anonymous/products/productList';
