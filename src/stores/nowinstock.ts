@@ -13,7 +13,9 @@ import { BROWSER_HEADERS, fetchWithTimeout, looksBlocked } from './detect';
  * tienda queda marcada como indirecta.
  */
 const URL_NIS = 'https://www.nowinstock.net/videogaming/consoles/sonyps5/';
-const CACHE_TTL_MS = 150_000;
+const CACHE_TTL_MS = 55_000;
+/** Igual que en hotstock: un error no debe dejar ciega a la tienda 2,5 minutos. */
+const ERROR_TTL_MS = 20_000;
 
 export interface NisEntry {
   inStock: boolean;
@@ -103,7 +105,8 @@ async function load(): Promise<Snapshot> {
 
 async function snapshot(): Promise<Snapshot> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_TTL_MS) return cache;
+  const ttl = cache && 'err' in cache ? ERROR_TTL_MS : CACHE_TTL_MS;
+  if (cache && now - cache.at < ttl) return cache;
   if (inFlight) return inFlight;
   inFlight = load().then((s) => {
     cache = s;

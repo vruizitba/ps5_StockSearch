@@ -17,3 +17,6 @@ debug/
 
 # OS
 .DS_Store
+
+# Fixtures generados por test/fixtures/build.mjs desde los .html capturados
+test/fixtures/*.ts

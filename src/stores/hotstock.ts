@@ -16,8 +16,18 @@ import { BROWSER_HEADERS, fetchWithTimeout, looksBlocked } from './detect';
  * Se consulta una sola vez por ciclo y se cachea: son un servicio chico y
  * pegarle una vez por tienda por minuto seria abusivo.
  */
-const URL_HOTSTOCK = 'https://hotstock.io/us/p/playstation-5-pro-console-2tb';
-const CACHE_TTL_MS = 150_000; // ~2.5 min: una consulta cada ~3 ciclos
+// Con www: sin el, hotstock responde 301 y cada chequeo paga un salto de mas.
+const URL_HOTSTOCK = 'https://www.hotstock.io/us/p/playstation-5-pro-console-2tb';
+/** Cache de un resultado bueno. Una consulta por minuto es cortes y suficiente. */
+const CACHE_TTL_MS = 55_000;
+/**
+ * Cache de un error, mucho mas corta.
+ *
+ * Un fallo transitorio se cacheaba igual que un exito y dejaba a las cuatro
+ * tiendas indirectas ciegas dos minutos y medio. Reintentar a los 20 segundos
+ * cuesta poco y recorta la ventana en la que no se esta mirando nada.
+ */
+const ERROR_TTL_MS = 20_000;
 
 export interface HotstockEntry {
   inStock: boolean;
@@ -37,6 +47,12 @@ async function parse(res: Response): Promise<Map<string, HotstockEntry>> {
   // la unica opcion que entra en los 10 ms de CPU del plan gratuito.
   await new HTMLRewriter()
     .on('h5.text-cell-shopname', {
+      // Un nombre nuevo cierra el anterior. Si una fila no trae boton, sin este
+      // reset el nombre viejo se pegaba al siguiente ("AmazonBest Buy") y la
+      // tienda pasaba a reportar ERROR por no encontrarse en el mapa.
+      element() {
+        currentShop = null;
+      },
       text(t) {
         const v = t.text.trim();
         if (v) currentShop = (currentShop ?? '') + v;
@@ -78,7 +94,8 @@ async function load(): Promise<Snapshot> {
 
 async function snapshot(): Promise<Snapshot> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_TTL_MS) return cache;
+  const ttl = cache && 'err' in cache ? ERROR_TTL_MS : CACHE_TTL_MS;
+  if (cache && now - cache.at < ttl) return cache;
   if (inFlight) return inFlight;
   inFlight = load().then((s) => {
     cache = s;

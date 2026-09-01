@@ -23,6 +23,9 @@ import { BROWSER_HEADERS, fetchWithTimeout, blocked, error, looksBlocked } from 
  * otra IP y suele pasar en el segundo o tercero.
  */
 const MAX_ATTEMPTS = 7;
+const RETRY_PAUSE_MS = 300;
+/** Timeout por intento: siete intentos lentos no entran en un ciclo de 60 s. */
+const ATTEMPT_TIMEOUT_MS = 7_000;
 const PRODUCT_CODE = '1000050928'; // PlayStation 5 Pro Console - 2 TB
 const API =
   'https://api.direct.playstation.com/commercewebservices/ps-direct-us/users/anonymous/products/productList';
@@ -45,9 +48,11 @@ export async function checkPlayStation(): Promise<StockResult> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response;
     try {
-      res = await fetchWithTimeout(`${API}?productCodes=${PRODUCT_CODE}`, {
-        headers: { ...BROWSER_HEADERS, Accept: 'application/json' },
-      });
+      res = await fetchWithTimeout(
+        `${API}?productCodes=${PRODUCT_CODE}`,
+        { headers: { ...BROWSER_HEADERS, Accept: 'application/json' } },
+        ATTEMPT_TIMEOUT_MS,
+      );
     } catch (e) {
       if (attempt === MAX_ATTEMPTS) return error(`fetch fallo: ${String(e).slice(0, 120)}`);
       continue;
@@ -60,8 +65,11 @@ export async function checkPlayStation(): Promise<StockResult> {
       ok = true;
       break;
     }
-    // Pausa breve entre intentos: la espera no consume CPU del Worker.
-    if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400 * attempt));
+    // Pausa breve y plana entre intentos. Era creciente (400 ms x intento), lo
+    // que sumaba 8,4 s de espera antes de rendirse y hacia de PlayStation el
+    // tramo mas lento del ciclo justo cuando hay que ser rapido. El reintento
+    // sirve porque cada salida usa otra IP, no porque se espere mas.
+    if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
   }
 
   if (!ok) {

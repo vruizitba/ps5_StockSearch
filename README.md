@@ -33,7 +33,8 @@ el código sigue sirviendo si alguna vez esto corre desde una IP casera.
 IPs de Cloudflare: algunas de sus IPs de salida están marcadas y otras no, así que
 el mismo pedido pasa o falla según cuál le toque. No es límite de frecuencia —
 diez consultas seguidas desde una conexión residencial dan 200. El chequeo hace
-hasta 4 intentos; cada uno sale por otra IP y suele pasar en el segundo.
+hasta 7 intentos con 300 ms entre uno y otro; cada uno sale por otra IP y suele
+pasar en el segundo o el tercero.
 
 **PlayStation Direct sí es directa.** Su página está detrás de Akamai y no trae el
 stock — sirve todos los estados ocultos y deja que su JavaScript decida. Pero el
@@ -54,6 +55,73 @@ DISABLED      falta una API key
 del diseño: si un scraper roto se reportara como "agotado", el silencio se
 confundiría con "todavía no hay" y no te enterarías de que quedaste ciego. Cuando
 una tienda falla 30 minutos seguidos, llega un mail de aviso.
+
+## Que el correo llegue
+
+El monitor puede mirar bien y aun así no avisarte. Esa es la falla cara, y es la
+que más trabajo tiene encima.
+
+**El envío no se da por hecho.** Cada alerta se manda con hasta 3 intentos: un
+5xx, un 429 o un corte de red se reintentan; un 4xx no, porque repetirlo da el
+mismo error. Solo si Resend acepta se marca la tienda como notificada. Antes se
+marcaba siempre: un rechazo activaba igual el silencio de 6 horas y la alerta no
+se reintentaba nunca. Hoy, un envío fallido se vuelve a intentar al ciclo
+siguiente, un minuto después.
+
+**Un destinatario por pedido.** Resend valida la lista entera antes de mandar: con
+una sola dirección que no acepte, rechaza el pedido completo con 422 y no le llega
+a nadie. Mandando de a uno, una dirección rota solo se pierde a sí misma.
+
+**Queda registro.** Cada intento va a la tabla `notifications`, con el error de
+Resend si lo hubo. `GET /api/notifications` lo lista y el dashboard muestra una
+franja roja si el último correo no salió.
+
+**Ensayo cuando quieras.** `POST /api/simulate?token=` manda el mail real de stock
+—misma plantilla, mismo remitente, mismos destinatarios— sin esperar a que haya
+stock. No toca la base, así que no puede silenciar una alerta de verdad.
+
+> Con el remitente `onboarding@resend.dev` (el de prueba de Resend) solo se puede
+> mandar a la casilla dueña de la cuenta. Para sumar destinatarios hay que
+> verificar un dominio propio en Resend y cambiar `FROM_EMAIL`.
+
+**Si el reloj se para.** Es la única falla de la que la app no puede avisar sola:
+si dejó de correr, no hay nadie adentro para mandar el mail. Tres defensas:
+
+1. La alarma se reprograma **antes** de trabajar, así que un ciclo que explota no
+   corta la cadena.
+2. Si una alarma pendiente quedó vencida hace más de 3 minutos, se considera
+   trabada y cualquier petición al Worker la vuelve a armar.
+3. Cuando el reloj arranca después de un hueco de más de 5 minutos, manda un mail
+   diciendo cuánto tiempo estuvo ciego. El silencio no puede pasar por "no hubo
+   stock".
+
+Para cubrir el caso de que el Worker entero deje de responder, `GET /health`
+devuelve **503** si hace más de 5 minutos que no se chequea nada, si el último
+correo falló, o si todas las tiendas están ciegas. Apuntá ahí un monitor de uptime
+gratuito (UptimeRobot, cron-job.org) y ese escenario también te llega por mail.
+
+## Tests
+
+```bash
+npm test          # 80 tests
+npm run typecheck
+```
+
+Corren sobre **workerd de verdad** (`@cloudflare/vitest-pool-workers`): D1,
+Durable Objects y `HTMLRewriter` son los del runtime real, no simulaciones. Lo
+único mockeado es la red saliente.
+
+| Archivo | Qué cubre |
+|---|---|
+| `test/notify.test.ts` | Reintentos, 4xx sin reintento, un destinatario roto no tumba a los demás, escapado de HTML |
+| `test/cycle.test.ts` | Alerta al aparecer stock, **reintento si el mail no salió**, cooldown, techo del backoff, aviso de fuente rota |
+| `test/stores.test.ts` | Mapeo de estados de PlayStation y Best Buy; 403 y JSON roto dan `BLOCKED`/`ERROR`, jamás "sin stock" |
+| `test/parsers.test.ts` | hotstock y nowinstock contra **HTML real capturado del sitio**, incluida una fila con stock de verdad |
+| `test/ticker.test.ts` | Armado, alarma trabada, orden de reprogramación, aviso de hueco |
+| `test/routes.test.ts` | Token en las rutas que actúan, `/health` en cada modo de falla |
+
+Las capturas de HTML están en `test/fixtures/`. Para refrescarlas cuando un sitio
+cambie, ver las instrucciones en `test/fixtures/build.mjs`.
 
 ## Puesta en marcha
 
@@ -92,6 +160,12 @@ Miniflare no dispara el cron solo. Para correr un ciclo a mano:
 curl -X POST "http://127.0.0.1:8787/api/run?token=TU_ADMIN_TOKEN"
 ```
 
+Para probar que la alerta de stock llega de verdad, sin esperar un drop:
+
+```bash
+curl -X POST "http://127.0.0.1:8787/api/simulate?token=TU_ADMIN_TOKEN"
+```
+
 ## Rutas
 
 | Ruta | Qué hace |
@@ -100,10 +174,12 @@ curl -X POST "http://127.0.0.1:8787/api/run?token=TU_ADMIN_TOKEN"
 | `GET /api/status` | Estado actual de las 7 tiendas |
 | `GET /api/history?hours=24` | Historial crudo |
 | `GET /api/blockrate?hours=168` | Tasa de fallas por tienda |
-| `GET /health` | Liveness |
+| `GET /health` | Salud: 503 si está viejo, ciego o el correo falla |
+| `GET /api/notifications` | Historial de correos enviados y rechazados |
 | `POST /api/check/:id?token=` | Fuerza el chequeo de una tienda |
 | `GET`/`POST` `/api/run?token=` | Fuerza un ciclo completo |
 | `POST /api/test-email?token=` | Manda un mail de prueba |
+| `POST /api/simulate?token=&store=` | Ensaya la alerta de stock real |
 
 Las rutas `POST` piden `ADMIN_TOKEN`: la página es pública y sin eso cualquiera
 podría gastar el presupuesto o disparar mails.

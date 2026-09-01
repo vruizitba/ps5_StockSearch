@@ -2,6 +2,7 @@ import type { Env, StockResult } from './types';
 import { STORES, type StoreMeta } from './stores/index';
 import {
   recordCheck, getState, markNotified, markHealthAlerted, clearHealthAlert, prune,
+  recordNotification,
 } from './db';
 import { alertInStock, alertUnhealthy } from './notify';
 
@@ -21,6 +22,51 @@ const DUE_GRACE_MS = 15_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Manda la alerta de stock y devuelve si salio.
+ *
+ * El orden importa: `markNotified` solo corre si Resend acepto el mail. Antes se
+ * marcaba siempre, asi que un rechazo de Resend activaba igual el cooldown de
+ * 6 horas y la alerta no se reintentaba nunca. El correo no llegaba y la app
+ * creia haber avisado — exactamente el modo de falla que no se puede permitir.
+ */
+async function notifyInStock(
+  env: Env,
+  store: StoreMeta,
+  result: StockResult,
+): Promise<boolean> {
+  let ok = false;
+  let detail: string | null = 'excepcion antes de enviar';
+
+  try {
+    const outcome = await alertInStock(env, store, result);
+    ok = outcome.ok;
+    detail = outcome.failed.length
+      ? outcome.failed.map((f) => `${f.to}: ${f.detail}`).join('; ').slice(0, 400)
+      : null;
+  } catch (e) {
+    detail = `excepcion: ${String(e).slice(0, 200)}`;
+  }
+
+  // Si marcar falla, el peor caso es un mail repetido. Aceptable: el error
+  // caro es el contrario, dar por avisado algo que nunca se envio.
+  if (ok) {
+    try {
+      await markNotified(env, store.id);
+    } catch (e) {
+      console.error('markNotified fallo', store.id, String(e).slice(0, 150));
+    }
+  }
+
+  try {
+    await recordNotification(env, store.id, 'IN_STOCK', ok, detail);
+  } catch (e) {
+    console.error('recordNotification fallo', String(e).slice(0, 150));
+  }
+
+  return ok;
 }
 
 export async function checkStore(env: Env, store: StoreMeta, force: boolean): Promise<StockResult | null> {
@@ -47,10 +93,11 @@ export async function checkStore(env: Env, store: StoreMeta, force: boolean): Pr
     const lastNotified = before?.last_notified_at ?? 0;
     const cooledDown = now - lastNotified > NOTIFY_COOLDOWN_MS;
 
-    // Avisar en la transicion a disponible, o si sigue disponible pasado el cooldown.
+    // Avisar en la transicion a disponible, o si sigue disponible pasado el
+    // cooldown. Un envio fallido no deja `last_notified_at`, asi que el proximo
+    // ciclo vuelve a intentarlo en vez de callarse seis horas.
     if (!wasInStock || cooledDown) {
-      await alertInStock(env, store, result);
-      await markNotified(env, store.id);
+      await notifyInStock(env, store, result);
     }
   }
 
@@ -59,8 +106,17 @@ export async function checkStore(env: Env, store: StoreMeta, force: boolean): Pr
     const streak = (before?.fail_streak ?? 0) + 1;
     const failingForMin = (streak * store.intervalSec) / 60;
     if (failingForMin >= UNHEALTHY_AFTER_MIN && !before?.health_alerted_at) {
-      await alertUnhealthy(env, store, result, Math.round(failingForMin));
-      await markHealthAlerted(env, store.id);
+      // El aviso de salud no puede tumbar el ciclo de las demas tiendas.
+      try {
+        const outcome = await alertUnhealthy(env, store, result, Math.round(failingForMin));
+        if (outcome.ok) await markHealthAlerted(env, store.id);
+        await recordNotification(
+          env, store.id, 'UNHEALTHY', outcome.ok,
+          outcome.failed.map((f) => `${f.to}: ${f.detail}`).join('; ').slice(0, 400) || null,
+        );
+      } catch (e) {
+        console.error('alertUnhealthy fallo', store.id, String(e).slice(0, 150));
+      }
     }
   } else if (before?.health_alerted_at) {
     await clearHealthAlert(env, store.id);
@@ -76,4 +132,3 @@ export async function runCycle(env: Env): Promise<void> {
   // Poda ocasional del historial (~1 de cada 500 ciclos, o sea varias veces por dia).
   if (Math.random() < 0.002) await prune(env);
 }
-

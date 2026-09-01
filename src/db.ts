@@ -1,5 +1,8 @@
 import type { Env, StockResult, StoreState, Status } from './types';
 
+/** Techo del backoff ante fallas, en segundos. */
+export const MAX_BACKOFF_SEC = 300;
+
 export async function getState(env: Env, storeId: string): Promise<StoreState | null> {
   return env.DB.prepare('SELECT * FROM store_state WHERE store_id = ?')
     .bind(storeId)
@@ -29,9 +32,16 @@ export async function recordCheck(
   const failed = result.status === 'BLOCKED' || result.status === 'ERROR';
   const streak = failed ? (prev?.fail_streak ?? 0) + 1 : 0;
 
-  // Backoff exponencial con techo de 30 min.
+  // Backoff exponencial con techo de 5 min.
+  //
+  // El techo era de 30 minutos y ese era el agujero mas caro de la app: un drop
+  // dura minutos, asi que una tienda con cinco fallas seguidas se quedaba ciega
+  // justo el rato en que hay que mirar. Ademas el 403 de PlayStation Direct no
+  // es limite de frecuencia sino IP de salida marcada, asi que reintentar es lo
+  // correcto, no lo abusivo. Cinco minutos alcanza para no martillar un muro y
+  // no alcanza para perderse una ventana de compra.
   const backoffSec = failed
-    ? Math.min(intervalSec * 2 ** Math.min(streak, 6), 1800)
+    ? Math.min(intervalSec * 2 ** Math.min(streak, 3), MAX_BACKOFF_SEC)
     : intervalSec;
   const nextCheckAt = now + backoffSec * 1000;
 
@@ -133,7 +143,52 @@ export async function blockRate(env: Env, hours: number): Promise<BlockRate[]> {
 
 /** Poda el historial. Sin esto D1 crece sin techo. */
 export async function prune(env: Env, keepDays = 30): Promise<void> {
-  await env.DB.prepare('DELETE FROM checks WHERE checked_at < ?')
-    .bind(Date.now() - keepDays * 86400_000)
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM checks WHERE checked_at < ?').bind(Date.now() - keepDays * 86400_000),
+    env.DB.prepare('DELETE FROM notifications WHERE created_at < ?').bind(Date.now() - keepDays * 86400_000),
+  ]);
+}
+
+export interface NotificationRow {
+  store_id: string;
+  kind: string;
+  ok: number;
+  detail: string | null;
+  created_at: number;
+}
+
+/**
+ * Deja constancia de cada intento de correo.
+ *
+ * Sin esto, un rechazo de Resend solo existia en un console.error que moria con
+ * el isolate. Con esto, `/health` puede responder si la ultima alerta salio.
+ */
+export async function recordNotification(
+  env: Env,
+  storeId: string,
+  kind: string,
+  ok: boolean,
+  detail: string | null,
+): Promise<void> {
+  await env.DB.prepare(
+    'INSERT INTO notifications (store_id, kind, ok, detail, created_at) VALUES (?, ?, ?, ?, ?)',
+  )
+    .bind(storeId, kind, ok ? 1 : 0, detail, Date.now())
     .run();
+}
+
+export async function lastNotifications(env: Env, limit = 20): Promise<NotificationRow[]> {
+  const { results } = await env.DB.prepare(
+    'SELECT store_id, kind, ok, detail, created_at FROM notifications ORDER BY created_at DESC LIMIT ?',
+  )
+    .bind(Math.min(Math.max(limit, 1), 200))
+    .all<NotificationRow>();
+  return results ?? [];
+}
+
+/** Ultimo intento de correo que FALLO y no tuvo un exito posterior. */
+export async function lastFailedNotification(env: Env): Promise<NotificationRow | null> {
+  return env.DB.prepare(
+    'SELECT store_id, kind, ok, detail, created_at FROM notifications WHERE ok = 0 ORDER BY created_at DESC LIMIT 1',
+  ).first<NotificationRow>();
 }

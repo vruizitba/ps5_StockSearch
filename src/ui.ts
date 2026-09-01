@@ -44,6 +44,10 @@ export function renderDashboard(): string {
   .DISABLED,.PENDING{color:var(--warn);background:var(--warn-bg)}
   .when{color:var(--muted);font-size:12px;white-space:nowrap;min-width:72px;text-align:right}
   .note{margin-top:18px;color:var(--muted);font-size:13px}
+  .health{display:none;margin:0 0 18px;padding:12px 14px;border-radius:10px;
+          font-size:14px;background:var(--bad-bg);color:var(--bad);
+          border:1px solid currentColor}
+  .health.on{display:block}
   .note code{background:var(--out-bg);padding:1px 5px;border-radius:4px}
   @media (max-width:560px){ .price,.when{display:none} }
 </style>
@@ -52,6 +56,7 @@ export function renderDashboard(): string {
 <div class="wrap">
   <h1>Monitor PS5 Pro</h1>
   <p class="sub" id="sub">Cargando...</p>
+  <div class="health" id="health"></div>
   <div class="card" id="list"></div>
   <p class="note">
     Las tiendas marcadas <em>via</em> son datos de terceros y pueden llegar con
@@ -90,6 +95,25 @@ function ago(ts, now){
   return Math.round(s/3600) + 'h';
 }
 
+// El monitor puede estar mirando bien y aun asi no poder avisarte. Esta franja
+// solo aparece cuando algo del canal de alertas esta roto: correo rechazado,
+// chequeos congelados o todas las tiendas ciegas. Si no se ve, esta todo bien.
+async function health(){
+  const box = document.getElementById('health');
+  let h;
+  try { h = await (await fetch('/health')).json(); }
+  catch { return; }
+
+  if (h.ok) { box.className = 'health'; return; }
+
+  const partes = [];
+  if (h.stale) partes.push('El monitor no chequea hace ' + Math.round((h.lastCheckAgeSec ?? 0)/60) + ' min.');
+  if (h.lastEmailFailure) partes.push('El ultimo correo no salio: ' + (h.lastEmailFailure.detail || 'sin detalle'));
+  if (h.storesBlind >= 7) partes.push('Ninguna tienda esta devolviendo estado.');
+  box.textContent = partes.join(' ') || 'El monitor no esta sano.';
+  box.className = 'health on';
+}
+
 async function load(){
   let d;
   try { d = await (await fetch('/api/status')).json(); }
@@ -115,8 +139,9 @@ async function load(){
     </div>\`).join('');
 }
 
-load();
+load(); health();
 setInterval(load, 15000);
+setInterval(health, 30000);
 </script>
 </body>
 </html>`;
