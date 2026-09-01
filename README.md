@@ -36,11 +36,16 @@ diez consultas seguidas desde una conexión residencial dan 200. El chequeo hace
 hasta 7 intentos con 300 ms entre uno y otro; cada uno sale por otra IP y suele
 pasar en el segundo o el tercero.
 
-Aun así falla el ~19 % de los chequeos (`GET /api/blockrate`), y ningún tercero
+Aun así falla una parte de los chequeos (`GET /api/blockrate`), y ningún tercero
 lo cubre: ni hotstock ni nowinstock listan PlayStation Direct para la Pro 2TB.
-Por eso es la única tienda **sin backoff**: espaciar los chequeos no destraba un
-bloqueo que no es por frecuencia, solo encadena minutos sin mirar justo donde es
-más probable que caiga el drop. Sigue chequeándose cada 60 s pase lo que pase.
+
+**El volumen sí importa, medido.** Se probó quitarle el backoff a esta tienda,
+razonando que su 403 es IP de salida marcada y no límite de frecuencia. Con eso
+pasa a recibir 7 pedidos por minuto de forma sostenida mientras dure un bloqueo,
+y el bloqueo trepó del 3 % al 80 % en hora y media. La conclusión es la
+contraria: insistir se paga. El backoff quedó puesto, y además el esfuerzo por
+chequeo se modula — 7 intentos con la tienda sana, 2 cuando ya lleva 3 fallas
+seguidas, porque ahí solo hace falta detectar que se recuperó.
 
 **PlayStation Direct sí es directa.** Su página está detrás de Akamai y no trae el
 stock — sirve todos los estados ocultos y deja que su JavaScript decida. Pero el

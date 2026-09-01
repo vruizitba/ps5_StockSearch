@@ -28,13 +28,11 @@ export interface Store {
   /** Segundos entre chequeos. */
   intervalSec: number;
   /**
-   * Si espaciar los chequeos tras una falla. Por defecto si.
-   *
-   * Se apaga cuando el bloqueo no es por frecuencia: ahi el backoff no consigue
-   * el dato antes, solo alarga el rato en que no se esta mirando.
+   * `failStreak` son las fallas seguidas que ya lleva esta tienda. Sirve para
+   * que un chequeo module su esfuerzo: insistir fuerte contra una fuente que ya
+   * esta bloqueada no consigue el dato y empeora la reputacion de la IP.
    */
-  backoffOnFailure?: boolean;
-  check(env: Env): Promise<StockResult>;
+  check(env: Env, failStreak: number): Promise<StockResult>;
 }
 
 export interface Env {

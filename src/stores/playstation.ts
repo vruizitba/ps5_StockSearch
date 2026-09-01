@@ -22,7 +22,20 @@ import { BROWSER_HEADERS, fetchWithTimeout, blocked, error, looksBlocked } from 
  * una conexion residencial dan 200. Por eso se reintenta: cada intento sale por
  * otra IP y suele pasar en el segundo o tercero.
  */
-const MAX_ATTEMPTS = 7;
+/**
+ * Intentos por chequeo, segun si la tienda ya viene fallando.
+ *
+ * Medido en produccion: al quitarle el backoff a esta tienda, el bloqueo de Sony
+ * trepo del 3% al 80% en hora y media. Con 7 intentos por minuto sostenidos, el
+ * 403 deja de ser solo "IP de salida marcada" y se vuelve una penalizacion que
+ * nos ganamos nosotros. Asi que el esfuerzo se modula: siete intentos cuando la
+ * tienda responde bien, dos cuando ya esta bloqueada — ahi solo hace falta
+ * detectar que se recupero, y castigar la puerta no la abre antes.
+ */
+const MAX_ATTEMPTS_HEALTHY = 7;
+const MAX_ATTEMPTS_BLOCKED = 2;
+/** Fallas seguidas a partir de las cuales se baja el esfuerzo. */
+const BLOCKED_STREAK = 3;
 const RETRY_PAUSE_MS = 300;
 /** Timeout por intento: siete intentos lentos no entran en un ciclo de 60 s. */
 const ATTEMPT_TIMEOUT_MS = 7_000;
@@ -40,12 +53,15 @@ interface OccProduct {
   stock?: { stockLevelStatus?: string };
 }
 
-export async function checkPlayStation(): Promise<StockResult> {
+export async function checkPlayStation(failStreak = 0): Promise<StockResult> {
+  const maxAttempts =
+    failStreak >= BLOCKED_STREAK ? MAX_ATTEMPTS_BLOCKED : MAX_ATTEMPTS_HEALTHY;
+
   let body = '';
   let lastStatus = 0;
   let ok = false;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let res: Response;
     try {
       res = await fetchWithTimeout(
@@ -54,7 +70,7 @@ export async function checkPlayStation(): Promise<StockResult> {
         ATTEMPT_TIMEOUT_MS,
       );
     } catch (e) {
-      if (attempt === MAX_ATTEMPTS) return error(`fetch fallo: ${String(e).slice(0, 120)}`);
+      if (attempt === maxAttempts) return error(`fetch fallo: ${String(e).slice(0, 120)}`);
       continue;
     }
 
@@ -69,12 +85,12 @@ export async function checkPlayStation(): Promise<StockResult> {
     // que sumaba 8,4 s de espera antes de rendirse y hacia de PlayStation el
     // tramo mas lento del ciclo justo cuando hay que ser rapido. El reintento
     // sirve porque cada salida usa otra IP, no porque se espere mas.
-    if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
+    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
   }
 
   if (!ok) {
     return looksBlocked(lastStatus, body)
-      ? blocked(`HTTP ${lastStatus} en ${MAX_ATTEMPTS} intentos`)
+      ? blocked(`HTTP ${lastStatus} en ${maxAttempts} intentos`)
       : error(`HTTP ${lastStatus}`);
   }
 

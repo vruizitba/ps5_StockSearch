@@ -90,6 +90,21 @@ describe('PlayStation Direct', () => {
     expect(res.detail).toContain('7 intentos');
   }, 15_000);
 
+  it('con la tienda ya bloqueada insiste mucho menos', async () => {
+    // Sacarle el freno a esta tienda hizo trepar el bloqueo de Sony del 3% al
+    // 80% en hora y media. Con la racha alta solo se sondea si se recupero.
+    psReply(403, 'forbidden', 2);
+    const res = await checkPlayStation(5);
+    expect(res.status).toBe('BLOCKED');
+    expect(res.detail).toContain('2 intentos');
+  });
+
+  it('con la tienda sana vuelve al esfuerzo completo', async () => {
+    psReply(403, 'forbidden', 1);
+    psReply(200, psProduct('inStock'), 1);
+    expect((await checkPlayStation(0)).status).toBe('IN_STOCK');
+  });
+
   it('JSON invalido es ERROR', async () => {
     psReply(200, 'no soy json');
     expect((await checkPlayStation()).status).toBe('ERROR');
