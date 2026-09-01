@@ -4,3 +4,5 @@
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
 BESTBUY_API_KEY=
 ADMIN_TOKEN=un-string-largo-y-aleatorio
+TELEGRAM_BOT_TOKEN=123456789:AA...
+TELEGRAM_CHAT_ID=123456789

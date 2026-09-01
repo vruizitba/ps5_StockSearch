@@ -67,10 +67,20 @@ del diseño: si un scraper roto se reportara como "agotado", el silencio se
 confundiría con "todavía no hay" y no te enterarías de que quedaste ciego. Cuando
 una tienda falla 30 minutos seguidos, llega un mail de aviso.
 
-## Que el correo llegue
+## Que el aviso llegue
 
 El monitor puede mirar bien y aun así no avisarte. Esa es la falla cara, y es la
 que más trabajo tiene encima.
+
+**Dos canales, no uno.** La alerta sale por correo (Resend) y por Telegram en
+paralelo, y se considera entregada si la acepta **al menos uno**. Depender de un
+solo proveedor era el último punto único de falla: los tres vigilantes detectan
+el problema, pero si el único canal está caído, ninguno te lo puede contar. Un
+canal sin credenciales se saltea en silencio; con ninguno configurado, el envío
+falla explícito. `GET /health` lista los canales vivos.
+
+Telegram además llega antes: un push aparece en un segundo, mientras que un mail
+puede quedar unos minutos en cola. Un drop dura minutos.
 
 **El envío no se da por hecho.** Cada alerta se manda con hasta 3 intentos: un
 5xx, un 429 o un corte de red se reintentan; un 4xx no, porque repetirlo da el
@@ -79,7 +89,7 @@ marcaba siempre: un rechazo activaba igual el silencio de 6 horas y la alerta no
 se reintentaba nunca. Hoy, un envío fallido se vuelve a intentar al ciclo
 siguiente, un minuto después.
 
-**Un destinatario por pedido.** Resend valida la lista entera antes de mandar: con
+**Un destinatario por pedido (correo).** Resend valida la lista entera antes de mandar: con
 una sola dirección que no acepte, rechaza el pedido completo con 422 y no le llega
 a nadie. Mandando de a uno, una dirección rota solo se pierde a sí misma.
 
@@ -87,9 +97,10 @@ a nadie. Mandando de a uno, una dirección rota solo se pierde a sí misma.
 Resend si lo hubo. `GET /api/notifications` lo lista y el dashboard muestra una
 franja roja si el último correo no salió.
 
-**Ensayo cuando quieras.** `POST /api/simulate?token=` manda el mail real de stock
-—misma plantilla, mismo remitente, mismos destinatarios— sin esperar a que haya
-stock. No toca la base, así que no puede silenciar una alerta de verdad.
+**Ensayo cuando quieras.** `POST /api/simulate?token=` manda la alerta real de
+stock por todos los canales —misma plantilla, mismo remitente, mismos
+destinatarios— sin esperar a que haya stock. No toca la base, así que no puede
+silenciar una alerta de verdad.
 
 > Con el remitente `onboarding@resend.dev` (el de prueba de Resend) solo se puede
 > mandar a la casilla dueña de la cuenta. Para sumar destinatarios hay que
@@ -161,6 +172,7 @@ Durable Objects y `HTMLRewriter` son los del runtime real, no simulaciones. Lo
 | Archivo | Qué cubre |
 |---|---|
 | `test/notify.test.ts` | Reintentos, 4xx sin reintento, un destinatario roto no tumba a los demás, escapado de HTML |
+| `test/channels.test.ts` | Un canal caído no impide que el otro entregue; solo fallando los dos la alerta se reintenta |
 | `test/cycle.test.ts` | Alerta al aparecer stock, **reintento si el mail no salió**, cooldown, techo del backoff, aviso de fuente rota |
 | `test/stores.test.ts` | Mapeo de estados de PlayStation y Best Buy; 403 y JSON roto dan `BLOCKED`/`ERROR`, jamás "sin stock" |
 | `test/parsers.test.ts` | hotstock y nowinstock contra **HTML real capturado del sitio**, incluida una fila con stock de verdad |
@@ -186,6 +198,13 @@ npm run migrate:remote
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put BESTBUY_API_KEY   # opcional, ver abajo
 npx wrangler secret put ADMIN_TOKEN       # string largo y aleatorio
+
+# Telegram como segundo canal (opcional pero recomendado):
+# 1. @BotFather -> /newbot -> te da el token
+# 2. escribile al bot una vez: no puede iniciar la conversacion el
+# 3. el chat id sale de https://api.telegram.org/bot<TOKEN>/getUpdates
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_CHAT_ID
 
 # 4. Destinatarios: editar ALERT_EMAILS en wrangler.toml (separados por coma)
 
@@ -218,6 +237,7 @@ curl -X POST "http://127.0.0.1:8787/api/simulate?token=TU_ADMIN_TOKEN"
 | Ruta | Qué hace |
 |---|---|
 | `GET /` | Dashboard |
+| `GET /ps5pro.jpg` | Foto de la consola del dashboard, embebida en el bundle |
 | `GET /api/status` | Estado actual de las 7 tiendas |
 | `GET /api/history?hours=24` | Historial crudo |
 | `GET /api/blockrate?hours=168` | Tasa de fallas por tienda |

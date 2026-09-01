@@ -1,7 +1,10 @@
 import { env, fetchMock } from 'cloudflare:test';
 import { beforeAll, afterEach, describe, expect, it } from 'vitest';
 import { send, esc, recipients, alertInStock } from '../src/notify';
+import type { AlertMessage } from '../src/channels/types';
 import { fakeStore, mockResend } from './helpers';
+
+const MSG: AlertMessage = { subject: 'asunto', html: '<p>hola</p>', text: 'hola' };
 
 beforeAll(() => {
   fetchMock.activate();
@@ -12,7 +15,7 @@ afterEach(() => fetchMock.assertNoPendingInterceptors());
 describe('envio de correo', () => {
   it('reporta exito solo cuando Resend acepta', async () => {
     mockResend(200);
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(true);
     expect(out.delivered).toEqual(['uno@ejemplo.test']);
     expect(out.failed).toEqual([]);
@@ -22,7 +25,7 @@ describe('envio de correo', () => {
     // Este es el bug que costaba el stock: antes send() se tragaba el error y
     // la app marcaba la alerta como enviada.
     mockResend(422, 1, { message: 'Invalid `to` field' });
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(false);
     expect(out.failed[0]?.detail).toContain('422');
   });
@@ -31,27 +34,27 @@ describe('envio de correo', () => {
     // Un solo interceptor. Si reintentara, el segundo pedido no tendria a quien
     // pegarle y el test fallaria por conexion no interceptada.
     mockResend(422, 1);
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(false);
   });
 
   it('reintenta un 5xx y sale adelante', async () => {
     mockResend(500, 1);
     mockResend(200, 1);
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(true);
   });
 
   it('reintenta un 429 y sale adelante', async () => {
     mockResend(429, 1);
     mockResend(200, 1);
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(true);
   });
 
   it('se rinde tras 3 intentos seguidos de 5xx', async () => {
     mockResend(503, 3);
-    const out = await send(env, 'asunto', '<p>hola</p>');
+    const out = await send(env, MSG);
     expect(out.ok).toBe(false);
     expect(out.failed[0]?.detail).toContain('503');
   });
@@ -62,24 +65,25 @@ describe('envio de correo', () => {
     const multi = { ...env, ALERT_EMAILS: 'bueno@ejemplo.test, roto@example.com' };
     mockResend(200, 1);
     mockResend(422, 1, { message: 'Invalid `to` field' });
-    const out = await send(multi, 'asunto', '<p>hola</p>');
+    const out = await send(multi, MSG);
     expect(out.ok).toBe(true);
     expect(out.delivered.length).toBe(1);
     expect(out.failed.length).toBe(1);
   });
 
-  it('sin RESEND_API_KEY falla explicito, no en silencio', async () => {
-    const sinKey = { ...env, RESEND_API_KEY: '' };
-    const out = await send(sinKey, 'asunto', '<p>hola</p>');
+  it('sin ningun canal configurado falla explicito, no en silencio', async () => {
+    const pelado = { ...env, RESEND_API_KEY: '', TELEGRAM_BOT_TOKEN: '' };
+    const out = await send(pelado, MSG);
     expect(out.ok).toBe(false);
-    expect(out.failed[0]?.detail).toContain('RESEND_API_KEY');
+    expect(out.channels).toEqual([]);
+    expect(out.failed[0]?.detail).toContain('ningun canal');
   });
 
-  it('sin destinatarios falla explicito', async () => {
-    const sinDest = { ...env, ALERT_EMAILS: '  ,  ' };
-    const out = await send(sinDest, 'asunto', '<p>hola</p>');
+  it('sin destinatarios de correo no usa el canal de correo', async () => {
+    const sinDest = { ...env, ALERT_EMAILS: '  ,  ', TELEGRAM_BOT_TOKEN: '' };
+    const out = await send(sinDest, MSG);
     expect(out.ok).toBe(false);
-    expect(out.failed[0]?.detail).toContain('ALERT_EMAILS');
+    expect(out.channels).toEqual([]);
   });
 
   it('parsea la lista de destinatarios tolerando espacios y vacios', () => {

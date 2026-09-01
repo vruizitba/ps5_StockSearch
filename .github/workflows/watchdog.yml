@@ -83,21 +83,20 @@ jobs:
             echo "avisar=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Avisar por mail
+      - name: Avisar
         if: steps.probe.outputs.ok == 'false' && steps.dedup.outputs.avisar == 'true'
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAILS: ${{ vars.ALERT_EMAILS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CODE: ${{ steps.probe.outputs.code }}
           BODY: ${{ steps.probe.outputs.body }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -z "$RESEND_API_KEY" ]; then
-            echo "Sin RESEND_API_KEY: el aviso queda solo en el mail de GitHub."
-            exit 0
-          fi
           # Se manda desde GitHub, no desde el Worker: el Worker es justamente lo
-          # que puede estar caido.
+          # que puede estar caido. Y por los dos canales, para que el aviso de
+          # "se cayo el monitor" no dependa del mismo proveedor unico.
           python3 - <<'PY'
           import json, os, urllib.request
 
@@ -113,30 +112,49 @@ jobs:
               f'<p style="font-size:13px"><a href="{os.environ["RUN_URL"]}">'
               'Ver la corrida en GitHub</a></p></div>'
           )
-          for to in [a.strip() for a in os.environ["ALERT_EMAILS"].split(",") if a.strip()]:
+          # Sin User-Agent propio, Resend contesta 403: rechaza el
+          # 'Python-urllib/3.x' que manda urllib por defecto. Con la misma key,
+          # curl pasa. Lo encontro el ensayo de la alarma.
+          UA = "ps5-stock-monitor-watchdog/1.0"
+          entregados = 0
+
+          def post(url, payload, headers, etiqueta):
+              global entregados
               req = urllib.request.Request(
-                  "https://api.resend.com/emails",
-                  data=json.dumps({
-                      "from": "onboarding@resend.dev",
-                      "to": [to],
-                      "subject": "Monitor PS5: el worker no responde",
-                      "html": html,
-                  }).encode(),
-                  headers={
-                      "Authorization": f'Bearer {os.environ["RESEND_API_KEY"]}',
-                      "Content-Type": "application/json",
-                      # Sin User-Agent propio, Resend contesta 403: rechaza el
-                      # 'Python-urllib/3.x' que manda urllib por defecto. Con la
-                      # misma key, curl pasa. Lo encontro el ensayo de la alarma.
-                      "User-Agent": "ps5-stock-monitor-watchdog/1.0",
-                  },
+                  url, data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json", "User-Agent": UA, **headers},
               )
               try:
                   with urllib.request.urlopen(req, timeout=20) as r:
-                      print(to, "->", r.status)
+                      print(etiqueta, "->", r.status)
+                      entregados += 1
               except Exception as e:
                   # Anotacion de error: que se vea en la corrida, no solo en el log.
-                  print(f"::error::no se pudo avisar a {to}: {e}")
+                  print(f"::error::no se pudo avisar a {etiqueta}: {e}")
+
+          key = os.environ.get("RESEND_API_KEY", "")
+          for to in [a.strip() for a in os.environ.get("ALERT_EMAILS", "").split(",") if a.strip()]:
+              if not key:
+                  break
+              post("https://api.resend.com/emails",
+                   {"from": "onboarding@resend.dev", "to": [to],
+                    "subject": "Monitor PS5: el worker no responde", "html": html},
+                   {"Authorization": f"Bearer {key}"}, to)
+
+          tg = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+          for chat in [c.strip() for c in os.environ.get("TELEGRAM_CHAT_ID", "").split(",") if c.strip()]:
+              if not tg:
+                  break
+              post(f"https://api.telegram.org/bot{tg}/sendMessage",
+                   {"chat_id": chat, "parse_mode": "HTML", "disable_web_page_preview": True,
+                    "text": ("🚨 <b>El monitor de PS5 no responde</b>\n\n"
+                             f'HTTP {os.environ["CODE"]} en dos intentos.\n'
+                             "Mientras dure, no hay alertas de stock de ninguna tienda.\n\n"
+                             f'<a href="{os.environ["RUN_URL"]}">Ver la corrida</a>')},
+                   {}, f"telegram:{chat}")
+
+          if entregados == 0:
+              print("::error::ningun canal pudo entregar el aviso")
           PY
 
       # Falla el job a proposito: dispara ademas el mail propio de GitHub por

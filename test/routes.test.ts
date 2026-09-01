@@ -190,6 +190,16 @@ describe('lecturas publicas', () => {
     expect(res.headers.get('Content-Type')).toContain('text/html');
   });
 
+  it('/ps5pro.jpg sirve la foto del dashboard', async () => {
+    const res = await SELF.fetch('https://t.test/ps5pro.jpg');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/jpeg');
+    // Los dos primeros bytes de todo JPEG. Prueba que el base64 se decodifico
+    // bien y no que se sirvio la cadena en texto.
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect([bytes[0], bytes[1]]).toEqual([0xff, 0xd8]);
+  });
+
   it('una ruta desconocida da 404', async () => {
     expect((await SELF.fetch('https://t.test/nada')).status).toBe(404);
   });

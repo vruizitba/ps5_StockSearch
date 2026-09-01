@@ -3,8 +3,9 @@ import { STORES, STORE_BY_ID } from './stores/index';
 import {
   allStates, history, blockRate, lastNotifications, lastFailedNotification, recordNotification,
 } from './db';
-import { sendTestEmail, alertInStock, type SendOutcome } from './notify';
+import { sendTestEmail, alertInStock, activeChannels, type SendOutcome } from './notify';
 import { renderDashboard } from './ui';
+import { consolePhoto } from './photo';
 import { checkStore, runCycle } from './cycle';
 export { Ticker } from './ticker';
 
@@ -149,6 +150,9 @@ export default {
           lastCheckAgeSec: newest ? Math.round(ageMs / 1000) : null,
           storesTracked: states.length,
           storesBlind: blind,
+          // Que canales estan vivos. Con uno solo configurado, ese proveedor es
+          // un punto unico de falla y conviene que se vea.
+          channels: activeChannels(env),
           lastEmailFailure: recentFailure
             ? { kind: recentFailure.kind, store: recentFailure.store_id, detail: recentFailure.detail }
             : null,
@@ -221,6 +225,10 @@ export default {
       if (!authed) return json({ error: 'token invalido' }, 401);
       ctx.waitUntil(runCycle(env));
       return json({ started: true, at: Date.now() });
+    }
+
+    if (path === '/ps5pro.jpg') {
+      return consolePhoto();
     }
 
     if (path === '/') {

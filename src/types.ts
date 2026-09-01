@@ -43,6 +43,10 @@ export interface Env {
   ADMIN_TOKEN?: string;
   ALERT_EMAILS: string;
   FROM_EMAIL: string;
+  /** Telegram como segundo canal. Opcional: si falta, se usa solo el correo. */
+  TELEGRAM_BOT_TOKEN?: string;
+  /** Uno o varios chats, separados por coma. */
+  TELEGRAM_CHAT_ID?: string;
 }
 
 export interface StoreState {
