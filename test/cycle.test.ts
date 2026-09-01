@@ -119,6 +119,23 @@ describe('backoff ante fallas', () => {
     expect((state!.next_check_at - state!.checked_at) / 1000).toBe(60);
   });
 
+  it('una tienda puede pedir que no se le espacien los chequeos', async () => {
+    // PlayStation Direct: su bloqueo no es por frecuencia, asi que el backoff
+    // solo alargaria la ceguera en la tienda mas importante.
+    const store = fakeStore({
+      id: 'ps',
+      backoffOnFailure: false,
+      result: { status: 'BLOCKED', detail: '403' },
+    });
+
+    for (let i = 0; i < 6; i++) await checkStore(env, store, true);
+
+    const state = await getState(env, 'ps');
+    expect((state!.next_check_at - state!.checked_at) / 1000).toBe(60);
+    // La racha se sigue contando: el aviso de fuente rota tiene que llegar igual.
+    expect(state?.fail_streak).toBe(6);
+  });
+
   it('respeta next_check_at cuando no se fuerza', async () => {
     const store = fakeStore({ id: 'ps', result: { status: 'OUT_OF_STOCK' } });
     await checkStore(env, store, true);

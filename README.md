@@ -36,6 +36,12 @@ diez consultas seguidas desde una conexión residencial dan 200. El chequeo hace
 hasta 7 intentos con 300 ms entre uno y otro; cada uno sale por otra IP y suele
 pasar en el segundo o el tercero.
 
+Aun así falla el ~19 % de los chequeos (`GET /api/blockrate`), y ningún tercero
+lo cubre: ni hotstock ni nowinstock listan PlayStation Direct para la Pro 2TB.
+Por eso es la única tienda **sin backoff**: espaciar los chequeos no destraba un
+bloqueo que no es por frecuencia, solo encadena minutos sin mirar justo donde es
+más probable que caiga el drop. Sigue chequeándose cada 60 s pase lo que pase.
+
 **PlayStation Direct sí es directa.** Su página está detrás de Akamai y no trae el
 stock — sirve todos los estados ocultos y deja que su JavaScript decida. Pero el
 host de API (`api.direct.playstation.com`) no está protegido y devuelve el mismo

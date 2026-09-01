@@ -27,6 +27,13 @@ export interface Store {
   url: string;
   /** Segundos entre chequeos. */
   intervalSec: number;
+  /**
+   * Si espaciar los chequeos tras una falla. Por defecto si.
+   *
+   * Se apaga cuando el bloqueo no es por frecuencia: ahi el backoff no consigue
+   * el dato antes, solo alarga el rato en que no se esta mirando.
+   */
+  backoffOnFailure?: boolean;
   check(env: Env): Promise<StockResult>;
 }
 

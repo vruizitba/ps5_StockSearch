@@ -86,7 +86,9 @@ export async function checkStore(env: Env, store: StoreMeta, force: boolean): Pr
     result = { status: 'ERROR', detail: `excepcion: ${String(e).slice(0, 150)}` };
   }
 
-  const before = await recordCheck(env, store.id, result, store.intervalSec);
+  const before = await recordCheck(
+    env, store.id, result, store.intervalSec, store.backoffOnFailure ?? true,
+  );
 
   if (result.status === 'IN_STOCK') {
     const wasInStock = before?.status === 'IN_STOCK';

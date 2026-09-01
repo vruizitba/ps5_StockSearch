@@ -25,6 +25,7 @@ export async function recordCheck(
   storeId: string,
   result: StockResult,
   intervalSec: number,
+  backoffOnFailure = true,
 ): Promise<StoreState | null> {
   const now = Date.now();
   const prev = await getState(env, storeId);
@@ -40,9 +41,13 @@ export async function recordCheck(
   // es limite de frecuencia sino IP de salida marcada, asi que reintentar es lo
   // correcto, no lo abusivo. Cinco minutos alcanza para no martillar un muro y
   // no alcanza para perderse una ventana de compra.
-  const backoffSec = failed
-    ? Math.min(intervalSec * 2 ** Math.min(streak, 3), MAX_BACKOFF_SEC)
-    : intervalSec;
+  //
+  // Una tienda puede pedir que no se le aplique: si su bloqueo no es por
+  // frecuencia, espaciar los chequeos no destraba nada y solo alarga la ceguera.
+  const backoffSec =
+    failed && backoffOnFailure
+      ? Math.min(intervalSec * 2 ** Math.min(streak, 3), MAX_BACKOFF_SEC)
+      : intervalSec;
   const nextCheckAt = now + backoffSec * 1000;
 
   const statements = [

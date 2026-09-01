@@ -23,6 +23,13 @@ export const STORES: StoreMeta[] = [
     intervalSec: 60,
     direct: true,
     source: 'api.direct.playstation.com (SAP Commerce)',
+    // Sin backoff. El 403 de Sony no es limite de frecuencia sino IP de salida
+    // marcada: cada intento sale por otra y el siguiente minuto puede pasar
+    // perfectamente. Medido, falla el ~19% de los chequeos, asi que espaciarlos
+    // encadenaba ventanas de varios minutos sin mirar la tienda donde es mas
+    // probable que caiga el drop. Cada chequeo ya reintenta 7 veces por su
+    // cuenta, que es donde el reintento si sirve.
+    backoffOnFailure: false,
     check: () => checkPlayStation(),
   },
   {
