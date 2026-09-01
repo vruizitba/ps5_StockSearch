@@ -27,6 +27,13 @@ export default defineWorkersConfig({
             ADMIN_TOKEN: 'test-token',
             ALERT_EMAILS: 'uno@ejemplo.test',
             FROM_EMAIL: 'monitor@ejemplo.test',
+            // Explicitamente vacios. Wrangler carga .dev.vars tambien en los
+            // tests, asi que sin esto la suite dependeria de que credenciales
+            // tenga cargadas cada maquina: agregar Telegram a .dev.vars hizo
+            // que tests que solo mockean Resend salieran a la red de verdad.
+            // Los que prueban varios canales arman su propio env.
+            TELEGRAM_BOT_TOKEN: '',
+            TELEGRAM_CHAT_ID: '',
           },
         },
       },
