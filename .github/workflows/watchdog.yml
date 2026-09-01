@@ -15,14 +15,22 @@ on:
     # real puede estirarse; para un vigilante alcanza, porque lo que detecta es
     # una caida sostenida, no un hipo de un minuto.
     - cron: '*/5 * * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      health_url:
+        description: >-
+          URL a consultar. Dejala vacia para el monitor real. Poniendo una URL
+          muerta se ensaya el camino de la alarma: es la unica forma de saber
+          que el aviso funciona sin esperar a que el Worker se caiga de verdad.
+        required: false
+        default: ''
 
 permissions:
   actions: read
   contents: read
 
 env:
-  HEALTH_URL: https://ps5-stock-monitor.valenruiz2004-c85.workers.dev/health
+  HEALTH_URL: ${{ inputs.health_url || 'https://ps5-stock-monitor.valenruiz2004-c85.workers.dev/health' }}
 
 jobs:
   check:
