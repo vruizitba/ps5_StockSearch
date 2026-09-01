@@ -1,6 +1,6 @@
 import { SELF, env, fetchMock } from 'cloudflare:test';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { mockResend, resetDb } from './helpers';
+import { mockResend, notificationRows, resetDb } from './helpers';
 
 beforeAll(async () => {
   fetchMock.activate();
@@ -69,6 +69,30 @@ describe('ensayo de alerta', () => {
     const res = await SELF.fetch(`https://t.test/api/simulate?token=${TOKEN}`, { method: 'POST' });
     expect(res.status).toBe(502);
     expect(await res.json()).toMatchObject({ ok: false });
+  });
+
+  it('deja el intento registrado, salga o no', async () => {
+    mockResend(200, 1);
+    await SELF.fetch(`https://t.test/api/simulate?token=${TOKEN}&store=bestbuy`, { method: 'POST' });
+    mockResend(422, 1);
+    await SELF.fetch(`https://t.test/api/simulate?token=${TOKEN}&store=newegg`, { method: 'POST' });
+
+    const rows = await notificationRows();
+    expect(rows.map((r) => [r.store_id, r.kind, r.ok])).toEqual([
+      ['bestbuy', 'SIMULATE', 1],
+      ['newegg', 'SIMULATE', 0],
+    ]);
+  });
+
+  it('un ensayo fallido pone /health en rojo', async () => {
+    // Si el ensayo no llega, el canal esta roto de verdad: no puede quedar
+    // como si nada hubiera pasado.
+    await seedState('playstation', 'OUT_OF_STOCK', 30);
+    expect((await SELF.fetch('https://t.test/health')).status).toBe(200);
+
+    mockResend(422, 1);
+    await SELF.fetch(`https://t.test/api/simulate?token=${TOKEN}`, { method: 'POST' });
+    expect((await SELF.fetch('https://t.test/health')).status).toBe(503);
   });
 
   it('404 para una tienda que no existe', async () => {

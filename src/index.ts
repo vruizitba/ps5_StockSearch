@@ -1,7 +1,9 @@
 import type { Env, StockResult } from './types';
 import { STORES, STORE_BY_ID } from './stores/index';
-import { allStates, history, blockRate, lastNotifications, lastFailedNotification } from './db';
-import { sendTestEmail, alertInStock } from './notify';
+import {
+  allStates, history, blockRate, lastNotifications, lastFailedNotification, recordNotification,
+} from './db';
+import { sendTestEmail, alertInStock, type SendOutcome } from './notify';
 import { renderDashboard } from './ui';
 import { checkStore, runCycle } from './cycle';
 export { Ticker } from './ticker';
@@ -36,6 +38,23 @@ async function ensureTicking(env: Env): Promise<void> {
   } catch (e) {
     lastArmAttempt = 0;
     console.error('no se pudo armar el reloj', String(e).slice(0, 150));
+  }
+}
+
+/** Deja el intento en `notifications`, sin dejar que un fallo al anotar rompa la ruta. */
+async function logOutcome(
+  env: Env,
+  storeId: string,
+  kind: string,
+  outcome: SendOutcome,
+): Promise<void> {
+  try {
+    await recordNotification(
+      env, storeId, kind, outcome.ok,
+      outcome.failed.map((f) => `${f.to}: ${f.detail}`).join('; ').slice(0, 400) || null,
+    );
+  } catch (e) {
+    console.error('recordNotification fallo', String(e).slice(0, 150));
   }
 }
 
@@ -153,6 +172,7 @@ export default {
     if (path === '/api/test-email' && request.method === 'POST') {
       if (!authed) return json({ error: 'token invalido' }, 401);
       const outcome = await sendTestEmail(env);
+      await logOutcome(env, '-', 'TEST', outcome);
       // El status refleja lo que paso de verdad. Antes siempre devolvia
       // {sent:true} aunque Resend hubiera rechazado el mail.
       return json(outcome, outcome.ok ? 200 : 502);
@@ -179,6 +199,9 @@ export default {
         detail: 'SIMULACRO - no hay stock real',
       };
       const outcome = await alertInStock(env, store, fake);
+      // El ensayo queda registrado: si falla, el canal esta roto de verdad y
+      // /health tiene que ponerse en rojo igual que ante una alerta perdida.
+      await logOutcome(env, store.id, 'SIMULATE', outcome);
       return json({ simulated: store.id, ...outcome }, outcome.ok ? 200 : 502);
     }
 
