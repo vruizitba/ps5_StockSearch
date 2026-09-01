@@ -69,9 +69,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          previa=$(gh run list --workflow watchdog.yml --branch main \
+          # --repo explicito: el job no hace checkout, asi que gh no tiene
+          # contexto de repositorio y sin esto la consulta falla en silencio
+          # y el dedup nunca deduplica.
+          previa=$(gh run list --repo "${{ github.repository }}" \
+                     --workflow watchdog.yml --branch main \
                      --status completed --limit 1 --json conclusion \
-                     --jq '.[0].conclusion // "none"' 2>/dev/null || echo none)
+                     --jq '.[0].conclusion // "none"' 2>&1 || echo none)
           echo "Conclusion de la corrida anterior: $previa"
           if [ "$previa" = "failure" ]; then
             echo "avisar=false" >> "$GITHUB_OUTPUT"
