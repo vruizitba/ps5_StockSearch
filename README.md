@@ -153,10 +153,18 @@ corría sin `--repo` y fallaba en silencio (el job no hace `checkout`, así que
 `gh` no tenía contexto), y Resend devolvía 403 porque `urllib` manda
 `Python-urllib/3.x` como User-Agent y lo rechaza.
 
-> **Punto débil conocido:** GitHub desactiva los `cron` de repos sin actividad
-> durante 60 días, y atrasa los horarios bajo carga. Por eso conviene sumar
-> además un monitor dedicado (UptimeRobot, cron-job.org) apuntando a la misma
-> URL de `/health`: son cinco minutos y no tiene ninguno de esos dos problemas.
+> **Punto débil confirmado, no teórico.** Con `cron: '*/5'` este workflow no
+> disparó **ni una sola vez en 46 minutos**, con el workflow en estado `active` y
+> los disparos manuales funcionando 9 de 9. GitHub deprioriza los cron muy
+> frecuentes y descarta corridas bajo carga; además desactiva los `cron` de repos
+> sin actividad durante 60 días. Se bajó a `*/15`, que es más probable que
+> respete.
+>
+> Por eso el vigilante de primera línea es **UptimeRobot**, apuntado a la misma
+> URL de `/health` cada 5 minutos. Está verificado desde los dos lados: su panel
+> lo reporta, y `wrangler tail` capturó el pedido entrante
+> (`Mozilla/5.0+(compatible; UptimeRobot/2.0; ...)`). GitHub Actions queda como
+> respaldo.
 
 ## Tests
 
