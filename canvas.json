@@ -1,0 +1,8 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1040, "h": 760, "title": "Escritorio", "is_interactive": true },
+    { "file": "Mobile.dc.html", "x": 1140, "y": 0, "w": 390, "h": 844, "title": "Telefono", "is_interactive": true },
+    { "file": "Estados.dc.html", "x": 0, "y": 980, "w": 1040, "h": 420, "title": "Estados" }
+  ],
+  "launch": { "view": "canvas" }
+}

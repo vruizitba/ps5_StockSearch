@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .app {
+      --bg: #f6f7f9; --text: #1a1d21; --muted: #6b7280; --line: #e5e7eb;
+      --hover: #eceef1; --in: #0a7c3f; --out: #9ca3af; --bad: #b42318; --warn: #a15c00;
+    }
+    .app.dark {
+      --bg: #111315; --text: #e8eaed; --muted: #9aa1a9; --line: #2c3034;
+      --hover: #1b1e21; --in: #4ade80; --out: #6b7280; --bad: #f87171; --warn: #fbbf24;
+    }
+    .row { cursor: pointer; }
+    .row:active { background: var(--hover); }
+    .btn { cursor: pointer; font: inherit; }
+  </style>
+</helmet>
+<div class="app {{themeClass}}" style="min-height: 844px; background: var(--bg); color: var(--text)">
+  <div style="padding: 72px 20px 40px; display: flex; flex-direction: column; gap: 26px">
+
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em">PS5 Pro</span>
+      <button class="btn" onClick="{{toggleTheme}}" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--muted)">
+        <sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+        </sc-if>
+        <sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"></path></svg>
+        </sc-if>
+      </button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: {{headlineColor}}; text-wrap: pretty">{{headline}}</div>
+      <div style="font-size: 13px; color: var(--muted)">{{subline}}</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0">
+      <sc-for list="{{stores}}" as="s" hint-placeholder-count="7">
+        <div class="row" onClick="{{s.toggle}}" style="border-top: 1px solid var(--line)">
+          <div style="display: flex; align-items: center; gap: 13px; min-height: 56px; padding: 8px 0">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: {{s.dot}}; flex: none"></span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+              <span style="font-weight: 500">{{s.name}}</span>
+              <span style="font-size: 12px; color: {{s.subColor}}">{{s.sub}}</span>
+            </div>
+            <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{s.ago}}</span>
+          </div>
+          <sc-if value="{{s.open}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px; padding: 0 0 18px 20px">
+              <span style="font-size: 12.5px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{s.detail}}</span>
+              <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 500">Abrir tienda</a>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="border-top: 1px solid var(--line)"></div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted)">
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--in)"></span>disponible</span>
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--out)"></span>agotado</span>
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--bad)"></span>sin dato, no agotado</span>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","oscuro"],"default":"claro"},"escenario":{"editor":"enum","options":["sin stock","con stock"],"default":"sin stock"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: null, theme: null };
+  }
+
+  renderVals() {
+    var self = this;
+    var esc = this.props.escenario ?? 'sin stock';
+    var theme = this.state.theme ?? (this.props.tema ?? 'claro');
+    var dark = theme === 'oscuro';
+    var COLOR = dark
+      ? { in: '#4ade80', out: '#6b7280', bad: '#f87171', warn: '#fbbf24', text: '#e8eaed', muted: '#9aa1a9' }
+      : { in: '#0a7c3f', out: '#9ca3af', bad: '#b42318', warn: '#a15c00', text: '#1a1d21', muted: '#6b7280' };
+
+    var base = [
+      { id: 'gs', name: 'GameStop', st: 'IN_STOCK', ago: '8s', via: 'via hotstock.io', price: '$749.00', detail: 'add-to-cart activo' },
+      { id: 'am', name: 'Amazon', st: 'BLOCKED', ago: '2m', via: 'via hotstock.io', price: null, detail: 'HTTP 403 · muro anti-bot' },
+      { id: 'bb', name: 'Best Buy', st: 'DISABLED', ago: '—', via: null, price: null, detail: 'falta BESTBUY_API_KEY' },
+      { id: 'ps', name: 'PlayStation Direct', st: 'OUT_OF_STOCK', ago: '12s', via: null, price: '$749.00', detail: 'stock: NOT_IN_STOCK' },
+      { id: 'ne', name: 'Newegg', st: 'OUT_OF_STOCK', ago: '48s', via: null, price: '$749.99', detail: 'ProductRealtime: OUT_OF_STOCK' },
+      { id: 'wm', name: 'Walmart', st: 'OUT_OF_STOCK', ago: '2m', via: 'via hotstock.io', price: null, detail: 'sin stock' },
+      { id: 'tg', name: 'Target', st: 'OUT_OF_STOCK', ago: '2m', via: 'via hotstock.io', price: null, detail: 'sin stock' }
+    ];
+    if (esc === 'sin stock') {
+      base = base.map(function (s) {
+        return s.st === 'IN_STOCK'
+          ? { id: s.id, name: s.name, st: 'OUT_OF_STOCK', ago: s.ago, via: s.via, price: s.price, detail: 'sin stock' }
+          : s;
+      });
+    }
+
+    var ORDER = { IN_STOCK: 0, BLOCKED: 1, ERROR: 2, DISABLED: 3, OUT_OF_STOCK: 4 };
+    var shown = base.slice().sort(function (a, b) { return (ORDER[a.st] ?? 9) - (ORDER[b.st] ?? 9); });
+    var hay = base.filter(function (s) { return s.st === 'IN_STOCK'; });
+
+    var SUB = { BLOCKED: 'bloqueado', ERROR: 'error', DISABLED: 'sin API key', IN_STOCK: 'DISPONIBLE' };
+
+    var stores = shown.map(function (s) {
+      var open = self.state.open === s.id;
+      var flag = SUB[s.st];
+      var sub = flag ? flag : (s.price ? s.price : (s.via ? s.via : 'agotado'));
+      var subColor = s.st === 'IN_STOCK' ? COLOR.in : (s.st === 'DISABLED' ? COLOR.warn : (flag ? COLOR.bad : COLOR.muted));
+      return {
+        name: s.name,
+        sub: sub,
+        subColor: subColor,
+        ago: s.ago,
+        detail: s.detail,
+        open: open,
+        dot: s.st === 'IN_STOCK' ? COLOR.in : (s.st === 'OUT_OF_STOCK' ? COLOR.out : (s.st === 'DISABLED' ? COLOR.warn : COLOR.bad)),
+        toggle: function () { self.setState({ open: open ? null : s.id }); }
+      };
+    });
+
+    return {
+      themeClass: dark ? 'dark' : '',
+      isDark: dark,
+      isLight: !dark,
+      toggleTheme: function () { self.setState({ theme: dark ? 'claro' : 'oscuro' }); },
+      headline: hay.length ? 'Disponible en ' + hay[0].name : 'Sin stock',
+      headlineColor: hay.length ? COLOR.in : COLOR.text,
+      subline: hay.length ? 'Visto hace ' + hay[0].ago + ' · alerta enviada' : 'Chequeando cada 60 s',
+      stores: stores
+    };
+  }
+}
+</script>
+</body>
+</html>

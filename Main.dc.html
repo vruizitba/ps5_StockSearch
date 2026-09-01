@@ -1,0 +1,209 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .app {
+      --bg: #f6f7f9; --text: #1a1d21; --muted: #6b7280; --line: #e5e7eb;
+      --hover: #eceef1; --chip: #eceef1;
+      --in: #0a7c3f; --out: #9ca3af; --bad: #b42318; --bad-bg: #fdecea; --warn: #a15c00;
+    }
+    .app.dark {
+      --bg: #111315; --text: #e8eaed; --muted: #9aa1a9; --line: #2c3034;
+      --hover: #1b1e21; --chip: #24282c;
+      --in: #4ade80; --out: #6b7280; --bad: #f87171; --bad-bg: #2c1614; --warn: #fbbf24;
+    }
+    .row { cursor: pointer; }
+    .row:hover { background: var(--hover); }
+    .row .caret { opacity: 0; transition: opacity .12s; }
+    .row:hover .caret { opacity: 1; }
+    .btn { cursor: pointer; font: inherit; }
+    .btn:hover { background: var(--hover); }
+  </style>
+</helmet>
+<div class="app {{themeClass}}" style="min-height: 760px; background: var(--bg); color: var(--text)">
+  <div style="max-width: 680px; margin: 0 auto; padding: 64px 32px 56px; display: flex; flex-direction: column; gap: 32px">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+      <div style="display: flex; align-items: baseline; gap: 10px">
+        <span style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em">PS5 Pro</span>
+        <span style="font-size: 13px; color: var(--muted)">7 tiendas</span>
+      </div>
+      <button class="btn" onClick="{{toggleTheme}}" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted)">
+        <sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+        </sc-if>
+        <sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"></path></svg>
+        </sc-if>
+      </button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <div style="font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: {{headlineColor}}; text-wrap: pretty">{{headline}}</div>
+      <div style="font-size: 13px; color: var(--muted)">{{subline}}</div>
+    </div>
+
+    <sc-if value="{{alert}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 13px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="flex: none"><path d="M12 8v5"></path><path d="M12 16.5v.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        <span>{{alertText}}</span>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div style="display: flex; gap: 6px; padding-bottom: 10px">
+        <sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+          <button class="btn" onClick="{{f.pick}}" style="padding: 5px 12px; border: 0; border-radius: 999px; font-size: 13px; background: {{f.bg}}; color: {{f.fg}}">{{f.label}}</button>
+        </sc-for>
+      </div>
+
+      <sc-for list="{{stores}}" as="s" hint-placeholder-count="7">
+        <div class="row" onClick="{{s.toggle}}" style="border-top: 1px solid var(--line); padding: 0 8px">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 4px">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: {{s.dot}}; flex: none"></span>
+            <div style="flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px">
+              <span style="font-weight: 500">{{s.name}}</span>
+              <sc-if value="{{s.via}}" hint-placeholder-val="{{ true }}">
+                <span style="font-size: 12px; color: var(--muted)">{{s.via}}</span>
+              </sc-if>
+              <sc-if value="{{s.flag}}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 12px; font-weight: 500; color: {{s.flagColor}}">{{s.flag}}</span>
+              </sc-if>
+            </div>
+            <span style="font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums">{{s.price}}</span>
+            <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; width: 34px; text-align: right">{{s.ago}}</span>
+            <span class="caret" style="color: var(--muted); display: flex; width: 14px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transform: {{s.caret}}"><path d="M9 6l6 6-6 6"></path></svg>
+            </span>
+          </div>
+          <sc-if value="{{s.open}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 0 4px 16px 25px; font-size: 12.5px; color: var(--muted)">
+              <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{s.detail}}</span>
+              <a href="#" style="color: var(--muted); text-decoration: underline; text-underline-offset: 3px">abrir tienda</a>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="border-top: 1px solid var(--line)"></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 18px; font-size: 12px; color: var(--muted)">
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--in)"></span>disponible</span>
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--out)"></span>agotado</span>
+      <span style="display: flex; align-items: center; gap: 7px"><span style="width: 6px; height: 6px; border-radius: 999px; background: var(--bad)"></span>sin dato, no agotado</span>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"tema":{"editor":"enum","options":["claro","oscuro"],"default":"claro"},"escenario":{"editor":"enum","options":["sin stock","con stock","monitor caido"],"default":"con stock"},"$preview":{"width":1040,"height":760}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'todas', open: null, theme: null };
+  }
+
+  data() {
+    return [
+      { id: 'ps', name: 'PlayStation Direct', st: 'OUT_OF_STOCK', price: '$749.00', ago: '12s', via: null, detail: 'stock: NOT_IN_STOCK' },
+      { id: 'bb', name: 'Best Buy', st: 'DISABLED', price: '—', ago: '—', via: null, detail: 'falta BESTBUY_API_KEY' },
+      { id: 'ne', name: 'Newegg', st: 'OUT_OF_STOCK', price: '$749.99', ago: '48s', via: null, detail: 'ProductRealtime: OUT_OF_STOCK' },
+      { id: 'am', name: 'Amazon', st: 'BLOCKED', price: '—', ago: '2m', via: 'via hotstock.io', detail: 'HTTP 403 · muro anti-bot' },
+      { id: 'wm', name: 'Walmart', st: 'OUT_OF_STOCK', price: '—', ago: '2m', via: 'via hotstock.io', detail: 'sin stock' },
+      { id: 'tg', name: 'Target', st: 'OUT_OF_STOCK', price: '—', ago: '2m', via: 'via hotstock.io', detail: 'sin stock' },
+      { id: 'gs', name: 'GameStop', st: 'IN_STOCK', price: '$749.00', ago: '8s', via: 'via hotstock.io', detail: 'add-to-cart activo' }
+    ];
+  }
+
+  renderVals() {
+    var self = this;
+    var esc = this.props.escenario ?? 'con stock';
+    var theme = this.state.theme ?? (this.props.tema ?? 'claro');
+    var dark = theme === 'oscuro';
+    var COLOR = dark
+      ? { in: '#4ade80', out: '#6b7280', bad: '#f87171', warn: '#fbbf24', text: '#e8eaed', muted: '#9aa1a9', chip: '#24282c' }
+      : { in: '#0a7c3f', out: '#9ca3af', bad: '#b42318', warn: '#a15c00', text: '#1a1d21', muted: '#6b7280', chip: '#eceef1' };
+
+    var ORDER = { IN_STOCK: 0, BLOCKED: 1, ERROR: 2, DISABLED: 3, OUT_OF_STOCK: 4 };
+    var FLAG = { BLOCKED: 'bloqueado', ERROR: 'error', DISABLED: 'sin API key', IN_STOCK: 'DISPONIBLE' };
+
+    var all = this.data().slice();
+    if (esc !== 'con stock') {
+      all = all.map(function (s) {
+        return s.st === 'IN_STOCK' ? { id: s.id, name: s.name, st: 'OUT_OF_STOCK', price: s.price, ago: s.ago, via: s.via, detail: 'sin stock' } : s;
+      });
+    }
+    if (esc === 'monitor caido') {
+      all = all.map(function (s) { return { id: s.id, name: s.name, st: s.st, price: s.price, ago: '18m', via: s.via, detail: s.detail }; });
+    }
+
+    var hay = all.filter(function (s) { return s.st === 'IN_STOCK'; });
+    var rotos = all.filter(function (s) { return s.st === 'BLOCKED' || s.st === 'ERROR' || s.st === 'DISABLED'; });
+
+    var shown = all;
+    if (this.state.filter === 'stock') shown = hay;
+    if (this.state.filter === 'problemas') shown = rotos;
+    shown = shown.slice().sort(function (a, b) { return (ORDER[a.st] ?? 9) - (ORDER[b.st] ?? 9); });
+
+    var filters = [
+      { key: 'todas', label: 'Todas' },
+      { key: 'stock', label: 'Con stock' },
+      { key: 'problemas', label: 'Problemas' }
+    ].map(function (f) {
+      var on = self.state.filter === f.key;
+      return {
+        label: f.label,
+        bg: on ? COLOR.chip : 'transparent',
+        fg: on ? COLOR.text : COLOR.muted,
+        pick: function () { self.setState({ filter: f.key, open: null }); }
+      };
+    });
+
+    var stores = shown.map(function (s) {
+      var open = self.state.open === s.id;
+      return {
+        name: s.name,
+        via: s.via,
+        price: s.price,
+        ago: s.ago,
+        detail: s.detail,
+        open: open,
+        caret: open ? 'rotate(90deg)' : 'none',
+        flag: FLAG[s.st] ?? '',
+        flagColor: s.st === 'IN_STOCK' ? COLOR.in : (s.st === 'DISABLED' ? COLOR.warn : COLOR.bad),
+        dot: s.st === 'IN_STOCK' ? COLOR.in : (s.st === 'OUT_OF_STOCK' ? COLOR.out : (s.st === 'DISABLED' ? COLOR.warn : COLOR.bad)),
+        toggle: function () { self.setState({ open: open ? null : s.id }); }
+      };
+    });
+
+    var caido = esc === 'monitor caido';
+    return {
+      themeClass: dark ? 'dark' : '',
+      isDark: dark,
+      isLight: !dark,
+      toggleTheme: function () { self.setState({ theme: dark ? 'claro' : 'oscuro' }); },
+      headline: hay.length ? 'Disponible en ' + hay[0].name : 'Sin stock',
+      headlineColor: hay.length ? COLOR.in : COLOR.text,
+      subline: caido
+        ? 'Ultimo chequeo hace 18 min'
+        : (hay.length ? 'Visto hace ' + hay[0].ago + ' · alerta enviada' : 'Chequeando cada 60 s'),
+      alert: caido,
+      alertText: 'El monitor no chequea hace 18 min. Podria no avisarte.',
+      filters: filters,
+      stores: stores
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -127,6 +127,21 @@ gh secret set RESEND_API_KEY     # la misma key que usa el Worker
 gh variable set ALERT_EMAILS --body "tu@correo.com"
 ```
 
+**Ensayar la alarma.** El camino sano no prueba nada del camino que importa. El
+workflow acepta una URL de override para forzar el fallo sin esperar a que el
+Worker se caiga:
+
+```bash
+gh workflow run watchdog.yml \
+  -f health_url="https://ps5-stock-monitor.valenruiz2004-c85.workers.dev/no-existe"
+```
+
+Tiene que terminar en `failure` y mandarte el mail. Ese ensayo encontró tres
+fallas que el camino sano había dado por buenas: la consulta de deduplicación
+corría sin `--repo` y fallaba en silencio (el job no hace `checkout`, así que
+`gh` no tenía contexto), y Resend devolvía 403 porque `urllib` manda
+`Python-urllib/3.x` como User-Agent y lo rechaza.
+
 > **Punto débil conocido:** GitHub desactiva los `cron` de repos sin actividad
 > durante 60 días, y atrasa los horarios bajo carga. Por eso conviene sumar
 > además un monitor dedicado (UptimeRobot, cron-job.org) apuntando a la misma

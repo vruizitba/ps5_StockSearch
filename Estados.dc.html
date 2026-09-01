@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: #0a7c3f; }
+    a:hover { color: #075c2e; }
+  </style>
+</helmet>
+<div style="min-height: 420px; background: #f6f7f9; color: #1a1d21; padding: 44px 40px">
+  <div style="display: flex; flex-direction: column; gap: 28px">
+
+    <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280">Estados</span>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 40px">
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #0a7c3f; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 600; color: #0a7c3f">DISPONIBLE</span>
+          <span style="font-size: 13px; color: #6b7280">hay stock, alerta enviada</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #9ca3af; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 500">agotado</span>
+          <span style="font-size: 13px; color: #6b7280">la tienda respondio: no hay</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #b42318; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 500; color: #b42318">bloqueado</span>
+          <span style="font-size: 13px; color: #6b7280">403 o captcha, no sabemos</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #b42318; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 500; color: #b42318">error</span>
+          <span style="font-size: 13px; color: #6b7280">timeout o HTML cambiado</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #a15c00; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 500; color: #a15c00">sin API key</span>
+          <span style="font-size: 13px; color: #6b7280">no se chequea</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <span style="width: 7px; height: 7px; border-radius: 999px; background: #a15c00; flex: none; transform: translateY(-2px)"></span>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-weight: 500; color: #a15c00">esperando</span>
+          <span style="font-size: 13px; color: #6b7280">primer chequeo pendiente</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #e5e7eb; padding-top: 26px">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280">Aviso de salud</span>
+      <div style="display: flex; align-items: center; gap: 10px; max-width: 520px; padding: 10px 14px; border-radius: 10px; background: #fdecea; color: #b42318; font-size: 13px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="flex: none"><path d="M12 8v5"></path><path d="M12 16.5v.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        <span>El monitor no chequea hace 18 min. Podria no avisarte.</span>
+      </div>
+      <span style="font-size: 13px; color: #6b7280">Solo aparece cuando el canal de alertas esta roto. Si no se ve, esta todo bien.</span>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1040,"height":420}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>
