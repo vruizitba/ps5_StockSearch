@@ -60,6 +60,10 @@ export async function checkPlayStation(failStreak = 0): Promise<StockResult> {
   let body = '';
   let lastStatus = 0;
   let ok = false;
+  // Que intento fue el que paso. Va al detalle del chequeo para poder medir si
+  // los reintentos altos sirven de algo: cada intento es un pedido mas a Sony, y
+  // el volumen sostenido es lo que le empeora la reputacion a la IP.
+  let winner = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let res: Response;
@@ -79,6 +83,7 @@ export async function checkPlayStation(failStreak = 0): Promise<StockResult> {
 
     if (!looksBlocked(res.status, body) && res.ok) {
       ok = true;
+      winner = attempt;
       break;
     }
     // Pausa breve y plana entre intentos. Era creciente (400 ms x intento), lo
@@ -112,11 +117,13 @@ export async function checkPlayStation(failStreak = 0): Promise<StockResult> {
   // Solo inStock y lowStock son comprables. comingSoon y outOfStock no lo son.
   // Un valor desconocido se reporta como ERROR en vez de adivinar: si Sony
   // agrega un estado nuevo, preferimos un aviso a una alerta falsa.
+  const detail = `stockLevelStatus=${level} intento=${winner}/${maxAttempts}`;
+
   if (level === 'inStock' || level === 'lowStock') {
-    return { status: 'IN_STOCK', price, detail: `stockLevelStatus=${level}` };
+    return { status: 'IN_STOCK', price, detail };
   }
   if (level === 'outOfStock' || level === 'comingSoon') {
-    return { status: 'OUT_OF_STOCK', price, detail: `stockLevelStatus=${level}` };
+    return { status: 'OUT_OF_STOCK', price, detail };
   }
   return error(`stockLevelStatus desconocido: ${level}`);
 }

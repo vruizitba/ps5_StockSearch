@@ -68,6 +68,13 @@ describe('PlayStation Direct', () => {
     expect((await checkPlayStation()).status).toBe('OUT_OF_STOCK');
   });
 
+  it('registra en que intento paso, para poder medir si los reintentos sirven', async () => {
+    psReply(403, 'forbidden', 2);
+    psReply(200, psProduct('outOfStock'), 1);
+    const res = await checkPlayStation();
+    expect(res.detail).toContain('intento=3/7');
+  });
+
   it('un estado nuevo de Sony da ERROR, no una alerta inventada', async () => {
     psReply(200, psProduct('preorderable'));
     const res = await checkPlayStation();
