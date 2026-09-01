@@ -72,6 +72,16 @@ const LABEL = {
   ERROR:'error', DISABLED:'sin API key', PENDING:'esperando'
 };
 
+// La fuente real puede no ser la configurada: Best Buy y Newegg caen a terceros
+// cuando falta la API key o cuando los bloquean. El detalle del chequeo dice cual
+// se uso de verdad, y eso es lo que hay que mostrar.
+function srcLabel(s){
+  const d = s.detail || '';
+  const m = d.match(/via ([a-z.]+)/i);
+  if (m) return 'via ' + m[1];
+  return s.direct ? s.source : 'via ' + s.source;
+}
+
 function ago(ts, now){
   if(!ts) return '-';
   const s = Math.max(0, Math.round((now - ts)/1000));
@@ -98,7 +108,7 @@ async function load(){
       <span class="badge \${s.status}">\${LABEL[s.status] ?? s.status}</span>
       <span class="name">
         <a href="\${s.url}" target="_blank" rel="noopener">\${s.name}</a>
-        <span class="src">\${s.direct ? s.source : 'via ' + s.source}</span>
+        <span class="src">\${srcLabel(s)}</span>
       </span>
       <span class="price">\${s.price ?? '&mdash;'}</span>
       <span class="when">\${ago(s.checkedAt, d.now)}</span>
