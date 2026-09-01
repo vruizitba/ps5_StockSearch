@@ -108,8 +108,29 @@ si dejó de correr, no hay nadie adentro para mandar el mail. Tres defensas:
 
 Para cubrir el caso de que el Worker entero deje de responder, `GET /health`
 devuelve **503** si hace más de 5 minutos que no se chequea nada, si el último
-correo falló, o si todas las tiendas están ciegas. Apuntá ahí un monitor de uptime
-gratuito (UptimeRobot, cron-job.org) y ese escenario también te llega por mail.
+correo falló, o si todas las tiendas están ciegas.
+
+Contra eso vigila `.github/workflows/watchdog.yml`, que corre en GitHub —fuera de
+Cloudflare— cada 5 minutos. Consulta `/health` dos veces separadas por 30 s (un
+solo fallo puede ser un hipo de red) y, si las dos fallan, manda el mail **él
+mismo** vía Resend, sin pasar por el Worker caído, y además marca la corrida como
+fallida para que salte también la notificación propia de GitHub.
+
+No repite el aviso: si la corrida anterior ya había fallado, se saltea el mail. Un
+vigilante que manda doce mails por hora se termina silenciando, y un vigilante
+silenciado no vigila.
+
+Necesita dos cosas cargadas en el repo, ya configuradas:
+
+```bash
+gh secret set RESEND_API_KEY     # la misma key que usa el Worker
+gh variable set ALERT_EMAILS --body "tu@correo.com"
+```
+
+> **Punto débil conocido:** GitHub desactiva los `cron` de repos sin actividad
+> durante 60 días, y atrasa los horarios bajo carga. Por eso conviene sumar
+> además un monitor dedicado (UptimeRobot, cron-job.org) apuntando a la misma
+> URL de `/health`: son cinco minutos y no tiene ninguno de esos dos problemas.
 
 ## Tests
 

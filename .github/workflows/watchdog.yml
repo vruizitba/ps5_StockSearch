@@ -1,0 +1,131 @@
+# Vigilante externo del monitor de stock.
+#
+# El Worker se avisa solo cuando una tienda se rompe o cuando el reloj se para,
+# pero no puede avisar que dejo de correr: si no corre, no hay nadie adentro para
+# mandar el mail. Este workflow corre en la infraestructura de GitHub, fuera de
+# Cloudflare, y le pregunta a /health desde afuera.
+#
+# /health devuelve 503 si hace mas de 5 minutos que no se chequea ninguna tienda,
+# si el ultimo correo fallo, o si todas las tiendas estan ciegas.
+name: watchdog
+
+on:
+  schedule:
+    # Cada 5 minutos. GitHub atrasa los cron bajo carga, asi que el intervalo
+    # real puede estirarse; para un vigilante alcanza, porque lo que detecta es
+    # una caida sostenida, no un hipo de un minuto.
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  HEALTH_URL: https://ps5-stock-monitor.valenruiz2004-c85.workers.dev/health
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preguntarle a /health
+        id: probe
+        run: |
+          # Dos intentos separados por 30 s. Un solo fallo puede ser un hipo de
+          # red de GitHub; dos seguidos ya es la app.
+          for intento in 1 2; do
+            code=$(curl -sS -m 20 -o /tmp/health.json -w '%{http_code}' "$HEALTH_URL" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+              echo "Sano (HTTP 200)"; cat /tmp/health.json; exit 0
+            fi
+            echo "Intento $intento: HTTP $code"
+            [ "$intento" = 1 ] && sleep 30
+          done
+
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          {
+            echo 'body<<FIN'
+            head -c 600 /tmp/health.json 2>/dev/null || echo '(sin cuerpo)'
+            echo
+            echo FIN
+          } >> "$GITHUB_OUTPUT"
+
+      # Si la corrida anterior ya habia fallado, el aviso ya se mando. Un
+      # vigilante que manda 12 mails por hora se termina silenciando, y un
+      # vigilante silenciado no vigila.
+      - name: ¿Ya avisamos?
+        id: dedup
+        if: steps.probe.outputs.ok == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previa=$(gh run list --workflow watchdog.yml --branch main \
+                     --status completed --limit 1 --json conclusion \
+                     --jq '.[0].conclusion // "none"' 2>/dev/null || echo none)
+          echo "Conclusion de la corrida anterior: $previa"
+          if [ "$previa" = "failure" ]; then
+            echo "avisar=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "avisar=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Avisar por mail
+        if: steps.probe.outputs.ok == 'false' && steps.dedup.outputs.avisar == 'true'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAILS: ${{ vars.ALERT_EMAILS }}
+          CODE: ${{ steps.probe.outputs.code }}
+          BODY: ${{ steps.probe.outputs.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "Sin RESEND_API_KEY: el aviso queda solo en el mail de GitHub."
+            exit 0
+          fi
+          # Se manda desde GitHub, no desde el Worker: el Worker es justamente lo
+          # que puede estar caido.
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          html = (
+              '<div style="font-family:system-ui,sans-serif;max-width:520px">'
+              '<h2>El monitor de PS5 no responde</h2>'
+              f'<p>HTTP <strong>{os.environ["CODE"]}</strong> en dos intentos '
+              'separados por 30 segundos.</p>'
+              f'<pre style="background:#f4f4f5;padding:10px;border-radius:6px;'
+              f'font-size:12px;overflow:auto">{os.environ.get("BODY","")[:600]}</pre>'
+              '<p style="color:#666;font-size:14px">Mientras dure, no vas a '
+              'recibir alertas de stock de ninguna tienda.</p>'
+              f'<p style="font-size:13px"><a href="{os.environ["RUN_URL"]}">'
+              'Ver la corrida en GitHub</a></p></div>'
+          )
+          for to in [a.strip() for a in os.environ["ALERT_EMAILS"].split(",") if a.strip()]:
+              req = urllib.request.Request(
+                  "https://api.resend.com/emails",
+                  data=json.dumps({
+                      "from": "onboarding@resend.dev",
+                      "to": [to],
+                      "subject": "Monitor PS5: el worker no responde",
+                      "html": html,
+                  }).encode(),
+                  headers={
+                      "Authorization": f'Bearer {os.environ["RESEND_API_KEY"]}',
+                      "Content-Type": "application/json",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      print(to, "->", r.status)
+              except Exception as e:
+                  print(to, "-> fallo:", e)
+          PY
+
+      # Falla el job a proposito: dispara ademas el mail propio de GitHub por
+      # workflow fallido, que es el respaldo si el paso de Resend tambien falla.
+      - name: Marcar la corrida como fallida
+        if: steps.probe.outputs.ok == 'false'
+        run: |
+          echo "::error::/health devolvio ${{ steps.probe.outputs.code }}"
+          exit 1
