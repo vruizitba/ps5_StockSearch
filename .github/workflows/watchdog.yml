@@ -125,13 +125,18 @@ jobs:
                   headers={
                       "Authorization": f'Bearer {os.environ["RESEND_API_KEY"]}',
                       "Content-Type": "application/json",
+                      # Sin User-Agent propio, Resend contesta 403: rechaza el
+                      # 'Python-urllib/3.x' que manda urllib por defecto. Con la
+                      # misma key, curl pasa. Lo encontro el ensayo de la alarma.
+                      "User-Agent": "ps5-stock-monitor-watchdog/1.0",
                   },
               )
               try:
                   with urllib.request.urlopen(req, timeout=20) as r:
                       print(to, "->", r.status)
               except Exception as e:
-                  print(to, "-> fallo:", e)
+                  # Anotacion de error: que se vea en la corrida, no solo en el log.
+                  print(f"::error::no se pudo avisar a {to}: {e}")
           PY
 
       # Falla el job a proposito: dispara ademas el mail propio de GitHub por
