@@ -96,11 +96,25 @@ curl -X POST "http://127.0.0.1:8787/api/run?token=TU_ADMIN_TOKEN"
 | `GET /api/blockrate?hours=168` | Tasa de fallas por tienda |
 | `GET /health` | Liveness |
 | `POST /api/check/:id?token=` | Fuerza el chequeo de una tienda |
-| `POST /api/run?token=` | Fuerza un ciclo completo |
+| `GET`/`POST` `/api/run?token=` | Fuerza un ciclo completo |
 | `POST /api/test-email?token=` | Manda un mail de prueba |
 
 Las rutas `POST` piden `ADMIN_TOKEN`: la página es pública y sin eso cualquiera
 podría gastar el presupuesto o disparar mails.
+
+## Disparador externo
+
+Cloudflare tiene un bug conocido en cuentas nuevas: el cron queda registrado y
+aparece en `/schedules`, pero nunca dispara. Si te pasa, apuntá un servicio de
+cron gratuito a esta URL cada minuto:
+
+```
+https://TU-WORKER.workers.dev/api/run?token=TU_ADMIN_TOKEN
+```
+
+Acepta `GET` para que sirva con cualquier servicio, y es idempotente: `next_check_at`
+evita que una llamada de más repita chequeos ya hechos. Podés dejarlo puesto aunque
+el cron nativo se arregle; no duplica trabajo.
 
 ## API key de Best Buy
 

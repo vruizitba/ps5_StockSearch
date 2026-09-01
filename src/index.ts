@@ -143,10 +143,14 @@ export default {
       return json({ store: store.id, result });
     }
 
-    if (path === '/api/run' && request.method === 'POST') {
+    // Acepta GET ademas de POST: sirve como disparador externo para cuando el
+    // cron de Cloudflare no corre (bug conocido en cuentas nuevas). Un servicio
+    // de cron gratuito puede pegarle cada minuto. Es idempotente: next_check_at
+    // hace que una llamada de mas no repita chequeos ya hechos.
+    if (path === '/api/run') {
       if (!authed) return json({ error: 'token invalido' }, 401);
       ctx.waitUntil(runCycle(env));
-      return json({ started: true });
+      return json({ started: true, at: Date.now() });
     }
 
     if (path === '/') {
