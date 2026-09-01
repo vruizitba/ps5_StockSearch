@@ -11,7 +11,7 @@ sin dejar ninguna computadora prendida.
 |---|---|---|
 | PlayStation Direct | `api.direct.playstation.com` (SAP Commerce) | directa |
 | Best Buy | API oficial de Best Buy | directa |
-| Newegg | API `ProductRealtime` de Newegg | directa |
+| Newegg | API `ProductRealtime`, con respaldo en nowinstock.net | mixta |
 | Amazon | hotstock.io | indirecta |
 | Walmart | hotstock.io | indirecta |
 | Target | hotstock.io | indirecta |
@@ -23,6 +23,11 @@ que parsear su HTML daría falsos positivos. hotstock.io ya monitorea las cuatro
 publica el estado en HTML plano. Es un tercero: no controlamos su frecuencia ni su
 continuidad, y la latencia es la de ellos más la nuestra. El dashboard las marca
 como indirectas y el mail lo aclara.
+
+**Newegg es mixta.** Su API `ProductRealtime` devuelve JSON limpio a un pedido
+desde una conexión residencial, pero responde 403 a las IPs de Cloudflare. El
+chequeo intenta la API primero y cae a nowinstock.net cuando lo bloquean, así que
+el código sigue sirviendo si alguna vez esto corre desde una IP casera.
 
 **PlayStation Direct sí es directa.** Su página está detrás de Akamai y no trae el
 stock — sirve todos los estados ocultos y deja que su JavaScript decida. Pero el

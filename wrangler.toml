@@ -9,8 +9,8 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "ps5_stock"
-# Reemplazar con el id real que devuelve: wrangler d1 create ps5_stock
-database_id = "PLACEHOLDER_REEMPLAZAR"
+# Base D1 creada en la cuenta del usuario (region ENAM)
+database_id = "367a8efe-0494-405d-9deb-9cef6b446337"
 
 [vars]
 # Los secrets (RESEND_API_KEY, BESTBUY_API_KEY) NO van aca.

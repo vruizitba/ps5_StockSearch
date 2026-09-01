@@ -78,8 +78,11 @@ function json(data: unknown, status = 200): Response {
 }
 
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(runCycle(env));
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    // Se espera el ciclo en vez de delegarlo a waitUntil: si el handler retorna
+    // antes de que termine, el runtime puede dar el evento por concluido y
+    // cortar los chequeos a la mitad.
+    await runCycle(env);
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {

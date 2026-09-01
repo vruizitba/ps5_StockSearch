@@ -1,13 +1,20 @@
 import type { StockResult } from '../types';
-import { BROWSER_HEADERS, fetchWithTimeout, blocked, error, looksBlocked } from './detect';
+import { BROWSER_HEADERS, fetchWithTimeout, error, looksBlocked } from './detect';
+import { checkViaNowInStock } from './nowinstock';
 
 /**
  * Newegg.
  *
  * La web (newegg.com/p/pl) devuelve 403 con CAPTCHA, pero su endpoint
- * ProductRealtime responde JSON a un fetch plano, sin key y sin muro.
- * Es la fuente mas limpia de todas las tiendas: da un booleano real.
+ * ProductRealtime responde JSON a un fetch plano, sin key y sin muro:
+ * es la fuente mas limpia de todas, porque da un booleano real.
+ *
+ * Con una salvedad medida en produccion: ese endpoint responde 200 desde una
+ * conexion residencial y 403 desde las IPs de Cloudflare. Por eso se intenta
+ * primero la via directa y, si aparece el bloqueo, se cae a nowinstock.
+ * Asi el codigo sigue sirviendo si algun dia esto corre desde una IP casera.
  */
+const NIS_ROW = 'Console: Pro 2TB : Newegg';
 const ITEM = 'N82E16868110346'; // PlayStation 5 Pro Console
 const API = 'https://www.newegg.com/product/api/ProductRealtime';
 
@@ -29,13 +36,14 @@ export async function checkNewegg(): Promise<StockResult> {
     res = await fetchWithTimeout(`${API}?ItemNumber=${ITEM}`, {
       headers: { ...BROWSER_HEADERS, Accept: 'application/json' },
     });
-  } catch (e) {
-    return error(`fetch fallo: ${String(e).slice(0, 120)}`);
+  } catch {
+    return checkViaNowInStock(NIS_ROW);
   }
 
   const body = await res.text();
-  if (looksBlocked(res.status, body)) return blocked(`HTTP ${res.status}`);
-  if (!res.ok) return error(`HTTP ${res.status}`);
+  // Newegg bloquea las IPs de datacenter: no es una falla, es el caso esperado
+  // en produccion. Se resuelve con el respaldo en vez de reportar BLOCKED.
+  if (looksBlocked(res.status, body) || !res.ok) return checkViaNowInStock(NIS_ROW);
 
   let item: NeweggResponse['MainItem'];
   try {
