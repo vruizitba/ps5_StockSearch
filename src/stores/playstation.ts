@@ -15,7 +15,14 @@ import { BROWSER_HEADERS, fetchWithTimeout, blocked, error, looksBlocked } from 
  *
  * Verificado: la consola da outOfStock mientras los accesorios dan inStock, o sea
  * que el campo discrimina de verdad y no es un default del template.
+ *
+ * Sony responde 403 de forma intermitente a las IPs de Cloudflare: algunas de sus
+ * IPs de salida estan marcadas y otras no, asi que el mismo pedido pasa o falla
+ * segun cual le toque. No es limite de frecuencia; diez consultas seguidas desde
+ * una conexion residencial dan 200. Por eso se reintenta: cada intento sale por
+ * otra IP y suele pasar en el segundo o tercero.
  */
+const MAX_ATTEMPTS = 4;
 const PRODUCT_CODE = '1000050928'; // PlayStation 5 Pro Console - 2 TB
 const API =
   'https://api.direct.playstation.com/commercewebservices/ps-direct-us/users/anonymous/products/productList';
@@ -31,18 +38,37 @@ interface OccProduct {
 }
 
 export async function checkPlayStation(): Promise<StockResult> {
-  let res: Response;
-  try {
-    res = await fetchWithTimeout(`${API}?productCodes=${PRODUCT_CODE}`, {
-      headers: { ...BROWSER_HEADERS, Accept: 'application/json' },
-    });
-  } catch (e) {
-    return error(`fetch fallo: ${String(e).slice(0, 120)}`);
+  let body = '';
+  let lastStatus = 0;
+  let ok = false;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(`${API}?productCodes=${PRODUCT_CODE}`, {
+        headers: { ...BROWSER_HEADERS, Accept: 'application/json' },
+      });
+    } catch (e) {
+      if (attempt === MAX_ATTEMPTS) return error(`fetch fallo: ${String(e).slice(0, 120)}`);
+      continue;
+    }
+
+    lastStatus = res.status;
+    body = await res.text();
+
+    if (!looksBlocked(res.status, body) && res.ok) {
+      ok = true;
+      break;
+    }
+    // Pausa breve entre intentos: la espera no consume CPU del Worker.
+    if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400 * attempt));
   }
 
-  const body = await res.text();
-  if (looksBlocked(res.status, body)) return blocked(`HTTP ${res.status}`);
-  if (!res.ok) return error(`HTTP ${res.status}`);
+  if (!ok) {
+    return looksBlocked(lastStatus, body)
+      ? blocked(`HTTP ${lastStatus} en ${MAX_ATTEMPTS} intentos`)
+      : error(`HTTP ${lastStatus}`);
+  }
 
   let product: OccProduct | undefined;
   try {

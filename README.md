@@ -29,6 +29,12 @@ desde una conexión residencial, pero responde 403 a las IPs de Cloudflare. El
 chequeo intenta la API primero y cae a nowinstock.net cuando lo bloquean, así que
 el código sigue sirviendo si alguna vez esto corre desde una IP casera.
 
+**PlayStation Direct reintenta.** Sony devuelve 403 de forma intermitente a las
+IPs de Cloudflare: algunas de sus IPs de salida están marcadas y otras no, así que
+el mismo pedido pasa o falla según cuál le toque. No es límite de frecuencia —
+diez consultas seguidas desde una conexión residencial dan 200. El chequeo hace
+hasta 4 intentos; cada uno sale por otra IP y suele pasar en el segundo.
+
 **PlayStation Direct sí es directa.** Su página está detrás de Akamai y no trae el
 stock — sirve todos los estados ocultos y deja que su JavaScript decida. Pero el
 host de API (`api.direct.playstation.com`) no está protegido y devuelve el mismo

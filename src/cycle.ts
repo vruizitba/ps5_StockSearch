@@ -9,6 +9,15 @@ import { alertInStock, alertUnhealthy } from './notify';
 const NOTIFY_COOLDOWN_MS = 6 * 3600_000;
 /** Minutos de fallas seguidas antes de avisar que una fuente esta rota. */
 const UNHEALTHY_AFTER_MIN = 30;
+/**
+ * Margen para considerar una tienda vencida.
+ *
+ * La alarma dispara cada 60 s y next_check_at se fija en +60 s exactos, asi que
+ * cualquier demora (el jitter, o unos milisegundos de deriva) hace que la tienda
+ * todavia no este vencida cuando llega el tick y se saltee hasta el siguiente.
+ * Eso duplicaba el intervalo real a ~120 s. La gracia absorbe esa deriva.
+ */
+const DUE_GRACE_MS = 15_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -19,7 +28,7 @@ export async function checkStore(env: Env, store: StoreMeta, force: boolean): Pr
   const now = Date.now();
 
   // next_check_at combina el intervalo normal con el backoff ante fallas.
-  if (!force && prev && prev.next_check_at > now) return null;
+  if (!force && prev && prev.next_check_at - DUE_GRACE_MS > now) return null;
 
   // Jitter: no pegarle a las tiendas siempre en el segundo redondo del minuto.
   if (!force) await sleep(Math.floor(Math.random() * 8000));
