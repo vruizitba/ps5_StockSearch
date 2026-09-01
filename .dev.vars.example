@@ -1,0 +1,6 @@
+# Copiar a .dev.vars para desarrollo local. .dev.vars esta en .gitignore.
+# En produccion estos valores se cargan con: wrangler secret put NOMBRE
+
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+BESTBUY_API_KEY=
+ADMIN_TOKEN=un-string-largo-y-aleatorio

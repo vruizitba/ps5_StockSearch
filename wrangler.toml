@@ -1,0 +1,19 @@
+name = "ps5-stock-monitor"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+
+# Chequeo cada minuto. Es el intervalo mas corto que permite Cloudflare.
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ps5_stock"
+# Reemplazar con el id real que devuelve: wrangler d1 create ps5_stock
+database_id = "PLACEHOLDER_REEMPLAZAR"
+
+[vars]
+# Los secrets (RESEND_API_KEY, BESTBUY_API_KEY) NO van aca.
+# Se cargan con: wrangler secret put NOMBRE
+ALERT_EMAILS = "valenruiz2004@gmail.com"
+FROM_EMAIL = "onboarding@resend.dev"

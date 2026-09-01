@@ -1,0 +1,19 @@
+# Secrets — NUNCA commitear
+.dev.vars
+.env
+.env.local
+*.pem
+
+# Dependencias
+node_modules/
+
+# Wrangler / Cloudflare
+.wrangler/
+dist/
+
+# Debug
+debug/
+*.log
+
+# OS
+.DS_Store
