@@ -32,6 +32,7 @@ export interface Store {
 
 export interface Env {
   DB: D1Database;
+  TICKER: DurableObjectNamespace;
   RESEND_API_KEY: string;
   BESTBUY_API_KEY?: string;
   ADMIN_TOKEN?: string;

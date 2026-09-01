@@ -12,6 +12,16 @@ database_name = "ps5_stock"
 # Base D1 creada en la cuenta del usuario (region ENAM)
 database_id = "367a8efe-0494-405d-9deb-9cef6b446337"
 
+# Reloj propio: la alarma del Durable Object reemplaza al cron, que en esta
+# cuenta quedo registrado pero nunca dispara (bug conocido en cuentas nuevas).
+[[durable_objects.bindings]]
+name = "TICKER"
+class_name = "Ticker"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Ticker"]
+
 [vars]
 # Los secrets (RESEND_API_KEY, BESTBUY_API_KEY) NO van aca.
 # Se cargan con: wrangler secret put NOMBRE

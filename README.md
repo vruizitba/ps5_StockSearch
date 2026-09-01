@@ -102,19 +102,29 @@ curl -X POST "http://127.0.0.1:8787/api/run?token=TU_ADMIN_TOKEN"
 Las rutas `POST` piden `ADMIN_TOKEN`: la página es pública y sin eso cualquiera
 podría gastar el presupuesto o disparar mails.
 
-## Disparador externo
+## Qué dispara los chequeos
 
-Cloudflare tiene un bug conocido en cuentas nuevas: el cron queda registrado y
-aparece en `/schedules`, pero nunca dispara. Si te pasa, apuntá un servicio de
-cron gratuito a esta URL cada minuto:
+No es el cron de Cloudflare. En esta cuenta quedó registrado y aparece en
+`/schedules`, pero nunca disparó: seis minutos de `wrangler tail` capturaron 196
+invocaciones `fetch` y cero programadas. Es un problema conocido en cuentas nuevas.
+
+En su lugar hay un **Durable Object con alarma** (`src/ticker.ts`) que se
+reprograma solo cada 60 segundos. Es otro mecanismo, funciona, y queda todo dentro
+de Cloudflare sin depender de servicios externos.
+
+La alarma se arma sola en la primera petición que reciba el Worker, así que si la
+cadena alguna vez se corta, basta abrir el dashboard. Para verla o forzarla:
 
 ```
-https://TU-WORKER.workers.dev/api/run?token=TU_ADMIN_TOKEN
+GET /api/ticker    ->  {"armed":false,"nextAlarm":1788286875778}
 ```
 
-Acepta `GET` para que sirva con cualquier servicio, y es idempotente: `next_check_at`
-evita que una llamada de más repita chequeos ya hechos. Podés dejarlo puesto aunque
-el cron nativo se arregle; no duplica trabajo.
+La próxima alarma se programa **antes** de correr el ciclo: si un chequeo explota,
+el reloj sobrevive. Al revés, un error dejaría el monitor muerto en silencio.
+
+Queda además `GET|POST /api/run?token=` como disparador manual o para un cron
+externo, por si algún día hace falta. Es idempotente: `next_check_at` evita repetir
+chequeos ya hechos.
 
 ## API key de Best Buy
 
