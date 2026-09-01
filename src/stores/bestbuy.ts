@@ -1,5 +1,6 @@
 import type { Env, StockResult } from '../types';
 import { fetchWithTimeout, blocked, error, looksBlocked } from './detect';
+import { checkViaHotstock } from './hotstock';
 
 /**
  * Best Buy via su API oficial.
@@ -9,7 +10,9 @@ import { fetchWithTimeout, blocked, error, looksBlocked } from './detect';
  * Es el unico camino legitimo y ademas el mas confiable.
  *
  * La key gratuita se pide en https://developer.bestbuy.com y puede demorar dias.
- * Sin ella la tienda queda DISABLED y no rompe el resto del ciclo.
+ * Mientras no este, el estado sale de hotstock, que tambien trackea Best Buy:
+ * asi la tienda funciona desde el primer dia. La diferencia es el precio, que
+ * hotstock no publica y la API si.
  */
 const SKU = '6601524'; // PlayStation 5 Pro Console (SKU confirmado en la URL del producto)
 const API = `https://api.bestbuy.com/v1/products(sku=${SKU})`;
@@ -28,9 +31,7 @@ interface BestBuyResponse {
 
 export async function checkBestBuy(env: Env): Promise<StockResult> {
   const key = env.BESTBUY_API_KEY;
-  if (!key) {
-    return { status: 'DISABLED', detail: 'falta BESTBUY_API_KEY' };
-  }
+  if (!key) return checkViaHotstock('Best Buy');
 
   let res: Response;
   try {
@@ -44,6 +45,7 @@ export async function checkBestBuy(env: Env): Promise<StockResult> {
 
   const body = await res.text();
   if (res.status === 403) return error('API key rechazada por Best Buy');
+  if (!res.ok && res.status >= 500) return checkViaHotstock('Best Buy');
   if (looksBlocked(res.status, body)) return blocked(`HTTP ${res.status}`);
   if (!res.ok) return error(`HTTP ${res.status}`);
 

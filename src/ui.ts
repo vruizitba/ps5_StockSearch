@@ -54,9 +54,15 @@ export function renderDashboard(): string {
   <p class="sub" id="sub">Cargando...</p>
   <div class="card" id="list"></div>
   <p class="note">
-    Las tiendas marcadas <em>via hotstock.io</em> son datos de terceros y pueden
-    llegar con retraso. <code>BLOCKED</code> y <code>ERROR</code> significan que no
-    pudimos leer esa tienda &mdash; <strong>no</strong> que no haya stock.
+    Las tiendas marcadas <em>via</em> son datos de terceros y pueden llegar con
+    retraso. <code>bloqueado</code> y <code>error</code> significan que no pudimos
+    leer esa tienda &mdash; <strong>no</strong> que no haya stock.
+  </p>
+  <p class="note">
+    El precio aparece solo donde la fuente lo publica: PlayStation Direct y Newegg
+    lo dan, hotstock.io no. Best Buy lo mostrar&aacute; cuando est&eacute; cargada
+    su API key. Un gui&oacute;n significa que esa fuente no informa precio, no que
+    el producto no tenga.
   </p>
 </div>
 <script>
@@ -94,7 +100,7 @@ async function load(){
         <a href="\${s.url}" target="_blank" rel="noopener">\${s.name}</a>
         <span class="src">\${s.direct ? s.source : 'via ' + s.source}</span>
       </span>
-      <span class="price">\${s.price ?? ''}</span>
+      <span class="price">\${s.price ?? '&mdash;'}</span>
       <span class="when">\${ago(s.checkedAt, d.now)}</span>
     </div>\`).join('');
 }

@@ -15,21 +15,38 @@ import { BROWSER_HEADERS, fetchWithTimeout, looksBlocked } from './detect';
 const URL_NIS = 'https://www.nowinstock.net/videogaming/consoles/sonyps5/';
 const CACHE_TTL_MS = 150_000;
 
-type Snapshot = { at: number; rows: Map<string, boolean> } | { at: number; err: string };
+export interface NisEntry {
+  inStock: boolean;
+  price?: string;
+}
+
+type Snapshot = { at: number; rows: Map<string, NisEntry> } | { at: number; err: string };
 
 let cache: Snapshot | null = null;
 let inFlight: Promise<Snapshot> | null = null;
 
-async function parse(res: Response): Promise<Map<string, boolean>> {
-  const rows = new Map<string, boolean>();
+async function parse(res: Response): Promise<Map<string, NisEntry>> {
+  const rows = new Map<string, NisEntry>();
   let label: string | null = null;
   let capturing = false;
+  // El precio vive en un <td> posterior al del estado, asi que se recuerda que
+  // fila se esta completando para poder volver sobre ella.
+  let pending: string | null = null;
+  let priceBuf = '';
 
   await new HTMLRewriter()
     // Cada fila arranca de cero: la etiqueta esta en el primer <td>, el estado
     // en el segundo, y sin reiniciar se cruzarian filas vecinas.
     .on('tr', {
       element() {
+        // Al cerrar la fila anterior se vuelca el precio acumulado.
+        if (pending) {
+          const t = priceBuf.trim();
+          const entry = rows.get(pending);
+          if (entry && /^\$[\d,.]+$/.test(t)) entry.price = t;
+        }
+        pending = null;
+        priceBuf = '';
         label = null;
         capturing = true;
       },
@@ -44,12 +61,28 @@ async function parse(res: Response): Promise<Map<string, boolean>> {
       element(el) {
         if (!label) return;
         const cls = el.getAttribute('class') ?? '';
-        rows.set(label.trim(), cls.includes('stockStatusIn') || cls.includes('stockStatusAvailable'));
+        const key = label.trim();
+        rows.set(key, {
+          inStock: cls.includes('stockStatusIn') || cls.includes('stockStatusAvailable'),
+        });
+        pending = key;
         capturing = false; // el resto de la fila ya no aporta etiqueta
+      },
+    })
+    .on('td.trackerPrice', {
+      text(t) {
+        if (pending) priceBuf += t.text;
       },
     })
     .transform(res)
     .arrayBuffer();
+
+  // La ultima fila no dispara el <tr> siguiente, asi que se vuelca a mano.
+  if (pending) {
+    const t = priceBuf.trim();
+    const entry = rows.get(pending);
+    if (entry && /^\$[\d,.]+$/.test(t)) entry.price = t;
+  }
 
   return rows;
 }
@@ -85,14 +118,15 @@ export async function checkViaNowInStock(rowLabel: string): Promise<StockResult>
   const snap = await snapshot();
   if ('err' in snap) return { status: 'ERROR', detail: `nowinstock: ${snap.err}` };
 
-  const inStock = snap.rows.get(rowLabel);
-  if (inStock === undefined) {
+  const entry = snap.rows.get(rowLabel);
+  if (!entry) {
     return { status: 'ERROR', detail: `nowinstock ya no lista "${rowLabel}"` };
   }
 
   const ageSec = Math.round((Date.now() - snap.at) / 1000);
   return {
-    status: inStock ? 'IN_STOCK' : 'OUT_OF_STOCK',
+    status: entry.inStock ? 'IN_STOCK' : 'OUT_OF_STOCK',
+    price: entry.price,
     detail: `via nowinstock (cache ${ageSec}s)`,
   };
 }

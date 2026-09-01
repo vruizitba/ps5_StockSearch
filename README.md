@@ -10,7 +10,7 @@ sin dejar ninguna computadora prendida.
 | Tienda | Fuente | Tipo |
 |---|---|---|
 | PlayStation Direct | `api.direct.playstation.com` (SAP Commerce) | directa |
-| Best Buy | API oficial de Best Buy | directa |
+| Best Buy | API oficial, con respaldo en hotstock.io | mixta |
 | Newegg | API `ProductRealtime`, con respaldo en nowinstock.net | mixta |
 | Amazon | hotstock.io | indirecta |
 | Walmart | hotstock.io | indirecta |
@@ -134,9 +134,27 @@ chequeos ya hechos.
 
 ## API key de Best Buy
 
+**No es obligatoria.** Sin ella, Best Buy se monitorea igual a través de hotstock.io.
+Lo que aporta la key es el precio, que hotstock no publica, y un dato de primera
+mano en vez de uno de tercero.
+
 Se pide gratis en [developer.bestbuy.com](https://developer.bestbuy.com) y puede
-demorar días. Sin ella, Best Buy queda en `DISABLED` y las otras seis tiendas
-funcionan igual. Cargala cuando llegue con `wrangler secret put BESTBUY_API_KEY`.
+demorar días. Cargala cuando llegue con `wrangler secret put BESTBUY_API_KEY`; el
+chequeo pasa solo a usar la API, sin redeploy.
+
+## Precios
+
+Aparecen solo donde la fuente los publica:
+
+| Tienda | Precio | Por qué |
+|---|---|---|
+| PlayStation Direct | sí | la API lo devuelve |
+| Newegg | sí | nowinstock.net lo publica |
+| Best Buy | con API key | hotstock no publica precios |
+| Amazon, Walmart, Target, GameStop | no | hotstock no publica precios |
+
+Amazon tampoco sirve para esto de forma directa: su página no trae el precio ni el
+estado en el HTML del servidor, los carga con JavaScript.
 
 ## Costos
 
