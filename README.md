@@ -153,18 +153,23 @@ corría sin `--repo` y fallaba en silencio (el job no hace `checkout`, así que
 `gh` no tenía contexto), y Resend devolvía 403 porque `urllib` manda
 `Python-urllib/3.x` como User-Agent y lo rechaza.
 
-> **Punto débil confirmado, no teórico.** Con `cron: '*/5'` este workflow no
-> disparó **ni una sola vez en 46 minutos**, con el workflow en estado `active` y
-> los disparos manuales funcionando 9 de 9. GitHub deprioriza los cron muy
-> frecuentes y descarta corridas bajo carga; además desactiva los `cron` de repos
-> sin actividad durante 60 días. Se bajó a `*/15`, que es más probable que
-> respete.
+> **Punto débil medido, no teórico.** GitHub deprioriza los `cron` frecuentes y
+> descarta corridas bajo carga:
+>
+> | cron | esperadas | reales |
+> |---|---|---|
+> | `*/5` | ~9 en 46 min | **0** |
+> | `*/15` | ~40 en 10 h | **2** |
+>
+> En los dos casos el workflow estaba en estado `active` y los disparos manuales
+> funcionaban 9 de 9. Quedó en **horario** (`17 * * * *`), que sí respetan.
+> También desactiva los `cron` de repos sin actividad durante 60 días.
 >
 > Por eso el vigilante de primera línea es **UptimeRobot**, apuntado a la misma
-> URL de `/health` cada 5 minutos. Está verificado desde los dos lados: su panel
-> lo reporta, y `wrangler tail` capturó el pedido entrante
-> (`Mozilla/5.0+(compatible; UptimeRobot/2.0; ...)`). GitHub Actions queda como
-> respaldo.
+> URL de `/health` cada 5 minutos. Verificado desde los dos lados: su panel lo
+> reporta, y `wrangler tail` capturó el pedido entrante
+> (`Mozilla/5.0+(compatible; UptimeRobot/2.0; ...)`). GitHub Actions es el
+> respaldo por si UptimeRobot mismo falla.
 
 ## Tests
 
@@ -303,6 +308,10 @@ Aparecen solo donde la fuente los publica:
 | Newegg | sí | nowinstock.net lo publica |
 | Best Buy | con API key | hotstock no publica precios |
 | Amazon, Walmart, Target, GameStop | no | hotstock no publica precios |
+
+Lo de hotstock está verificado sobre su HTML real: ninguna de sus seis filas trae
+precio. Consecuencia práctica a tener presente — una alerta de Amazon a las 3 AM
+no te deja distinguir un drop a $899 de un revendedor a $1.400 sin abrir el link.
 
 Amazon tampoco sirve para esto de forma directa: su página no trae el precio ni el
 estado en el HTML del servidor, los carga con JavaScript.

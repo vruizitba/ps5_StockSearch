@@ -11,17 +11,19 @@ name: watchdog
 
 on:
   schedule:
-    # Cada 15 minutos, no cada 5.
+    # Cada hora, medido y no elegido a gusto.
     #
-    # Con '*/5' este workflow no disparo ni una sola vez en 46 minutos, con el
-    # workflow en estado 'active' y los disparos manuales funcionando 9 de 9.
-    # GitHub desprioriza los cron muy frecuentes y directamente descarta
-    # corridas bajo carga. Un vigilante que nunca corre no vigila.
+    # '*/5' no disparo NI UNA VEZ en 46 minutos. '*/15' dio 2 corridas en 10
+    # horas, cuando tocaban 40. En los dos casos el workflow estaba en estado
+    # 'active' y los disparos manuales funcionaban. GitHub desprioriza los cron
+    # frecuentes y descarta corridas bajo carga; los horarios los respeta mucho
+    # mejor.
     #
-    # Bajar la frecuencia no cuesta cobertura real: UptimeRobot ya consulta la
-    # misma URL cada 5 minutos y es la primera linea. Este es el respaldo, y
-    # detecta caidas sostenidas, que es lo que importa.
-    - cron: '*/15 * * * *'
+    # No cuesta cobertura: UptimeRobot consulta la misma URL cada 5 minutos y es
+    # la primera linea. Este es el respaldo por si UptimeRobot mismo falla, y un
+    # respaldo que corre de verdad cada hora vale mas que uno que promete cada
+    # 15 minutos y corre cada cinco horas.
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       health_url:

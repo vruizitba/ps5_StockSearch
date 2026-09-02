@@ -31,8 +31,11 @@ const ERROR_TTL_MS = 20_000;
 
 export interface HotstockEntry {
   inStock: boolean;
-  price?: string;
 }
+
+// No hay campo de precio a proposito: hotstock no publica ninguno, verificado
+// sobre el HTML real de las seis filas. El campo existia declarado y sin asignar
+// nunca, lo que sugeria una fuente de precios que no existe.
 
 type Snapshot = { at: number; rows: Map<string, HotstockEntry> } | { at: number; err: string };
 
@@ -119,7 +122,6 @@ export async function checkViaHotstock(shopName: string): Promise<StockResult> {
   const ageSec = Math.round((Date.now() - snap.at) / 1000);
   return {
     status: entry.inStock ? 'IN_STOCK' : 'OUT_OF_STOCK',
-    price: entry.price,
     detail: `via hotstock (cache ${ageSec}s)`,
   };
 }
